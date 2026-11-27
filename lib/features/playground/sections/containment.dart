@@ -1,3 +1,4 @@
+import '../../../core/design/widgets/summary_card.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/design/bidi.dart';
@@ -38,6 +39,33 @@ class ContainmentSection extends StatelessWidget {
               Expanded(
                 child: Card.outlined(child: cardBody('Outlined', '5 أصناف')),
               ),
+            ],
+          ),
+        ],
+      ),
+      // P-07 (TAS-387): a card whose content fills its width.
+      SpecSection(
+        title: 'كارت الملخص',
+        m3: 'Cards (summary pattern)',
+        spec: 'components/cards',
+        children: [
+          SummaryCard(
+            icon: Icons.storefront_rounded,
+            title: 'فرع المعادي',
+            subtitle: 'سلسلة تجريبية',
+            trailingValue: Bidi.ltr('07:45'),
+            trailingCaption: 'المدة',
+            trailingIcon: Icons.timer_outlined,
+            labels: [
+              SummaryLabel(
+                'نشط',
+                container: Theme.of(context).colorScheme.tertiaryContainer,
+                onContainer: Theme.of(context).colorScheme.onTertiaryContainer,
+              ),
+            ],
+            facts: const [
+              SummaryFact(icon: Icons.login_rounded, label: 'الدخول', value: '09:02 ص'),
+              SummaryFact(icon: Icons.logout_rounded, label: 'الخروج', value: '04:47 م'),
             ],
           ),
         ],

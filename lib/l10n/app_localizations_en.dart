@@ -1430,6 +1430,290 @@ class AppLocalizationsEn extends AppLocalizations {
   String get activeChain => 'Current chain';
 
   @override
+  String get attChainLabel => 'Chain';
+
+  @override
+  String get attBranchLabel => 'Branch';
+
+  @override
+  String get attAllBranches => 'All branches';
+
+  @override
+  String get attMonthProgressTitle => 'Days attended of work days';
+
+  @override
+  String attMonthProgress(int count, int total) {
+    return 'Attended $count of $total work days';
+  }
+
+  @override
+  String get attDurationLabel => 'Duration';
+
+  @override
+  String get attCheckInLabel => 'Check-in';
+
+  @override
+  String get attCheckOutLabel => 'Check-out';
+
+  @override
+  String get notifKindAttention => 'Needs attention';
+
+  @override
+  String get notifKindDone => 'Done';
+
+  @override
+  String get notifKindChange => 'Change';
+
+  @override
+  String get notifKindWork => 'To do';
+
+  @override
+  String get notifKindAttendance => 'Attendance';
+
+  @override
+  String get notifKindInfo => 'Info';
+
+  @override
+  String get reqRejectReasonTitle => 'Reason for rejection';
+
+  @override
+  String get reqDecidedBy => 'Decided by';
+
+  @override
+  String reqHoursWord(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'hours',
+      one: 'hour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reqDaysWord(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'days',
+      one: 'day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reqDurationLabel => 'Duration';
+
+  @override
+  String get reqFilterPending => 'Pending';
+
+  @override
+  String get photosCaptureAction => 'Photograph a display';
+
+  @override
+  String get photoLoadFailed => 'Couldn\'t load the photo';
+
+  @override
+  String get photoPendingBanner =>
+      'This photo is still on the phone. It uploads when you are back online.';
+
+  @override
+  String get photoBannerOk => 'OK';
+
+  @override
+  String get photoShare => 'Share';
+
+  @override
+  String get photoShareFailed => 'Couldn\'t share the photo';
+
+  @override
+  String get photoOpenMap => 'Open on the map';
+
+  @override
+  String get photoMapFailed => 'Couldn\'t open the map';
+
+  @override
+  String get photoPrevious => 'Previous photo';
+
+  @override
+  String get photoNext => 'Next photo';
+
+  @override
+  String photoCounter(int index, int total) {
+    return '$index of $total';
+  }
+
+  @override
+  String photoSemantic(String branch, String time) {
+    return 'Photo at $branch, $time';
+  }
+
+  @override
+  String get profileWorkInfo => 'Work details';
+
+  @override
+  String get profileDelegateCode => 'Delegate code';
+
+  @override
+  String get profileChains => 'Chains';
+
+  @override
+  String get profileCopy => 'Copy';
+
+  @override
+  String get profileCopied => 'Code copied';
+
+  @override
+  String get profileShowId => 'Show number';
+
+  @override
+  String get profileHideId => 'Hide number';
+
+  @override
+  String get taskStart => 'Start task';
+
+  @override
+  String get taskFinish => 'Mark as done';
+
+  @override
+  String get taskOverdueLabel => 'Overdue';
+
+  @override
+  String taskOverdueBanner(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'This task is $count days overdue',
+      one: 'This task is 1 day overdue',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String taskDueInDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'In $count days',
+      one: 'Tomorrow',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get taskProofSection => 'Proof of work';
+
+  @override
+  String get taskFrom => 'From';
+
+  @override
+  String get taskAssignedToLabel => 'For';
+
+  @override
+  String get taskAssignedAll => 'All delegates';
+
+  @override
+  String get taskSentAt => 'Sent';
+
+  @override
+  String get taskDoneAt => 'Done';
+
+  @override
+  String get tasksFilterOpen => 'Open';
+
+  @override
+  String get tasksFilterDone => 'Done';
+
+  @override
+  String get tasksGroupOverdue => 'Overdue';
+
+  @override
+  String get tasksGroupOpen => 'Coming up';
+
+  @override
+  String get tasksGroupDone => 'Finished';
+
+  @override
+  String taskLateBy(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days late',
+      one: '1 day late',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get captureStepPlace => 'Place';
+
+  @override
+  String get captureStepPhotos => 'Photos';
+
+  @override
+  String capturePermissionUntil(String date) {
+    return 'Permission valid until $date';
+  }
+
+  @override
+  String get captureTapToReview =>
+      'Tap a photo to view it large, retake or remove it.';
+
+  @override
+  String get settingsAppearance => 'Appearance';
+
+  @override
+  String get settingsAuto => 'Auto';
+
+  @override
+  String get settingsContrast => 'Contrast';
+
+  @override
+  String get settingsContrastHint =>
+      'For text and borders. «High» reads better in sunlight.';
+
+  @override
+  String get settingsContrastStandard => 'Standard';
+
+  @override
+  String get settingsContrastMedium => 'Medium';
+
+  @override
+  String get settingsContrastHigh => 'High';
+
+  @override
+  String get settingsColorHint =>
+      'Every app colour is generated from this one.';
+
+  @override
+  String get settingsAbout => 'About';
+
+  @override
+  String get feedbackOpen => 'Open';
+
+  @override
+  String get feedbackAnswered => 'Answered';
+
+  @override
+  String get feedbackSentAt => 'Sent';
+
+  @override
+  String get feedbackHasAnswer => 'Answered';
+
+  @override
+  String get feedbackNoAnswer => 'Not yet';
+
+  @override
+  String get feedbackYourMessage => 'Your message';
+
+  @override
+  String get feedbackScreenshot => 'Attached screenshot';
+
+  @override
+  String get feedbackNoAnswerYet =>
+      'No answer yet. You will get a notification when the team replies.';
+
+  @override
   String get allChains => 'All chains';
 
   @override

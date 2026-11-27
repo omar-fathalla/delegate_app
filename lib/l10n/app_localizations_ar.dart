@@ -1430,6 +1430,298 @@ class AppLocalizationsAr extends AppLocalizations {
   String get activeChain => 'السلسلة الحالية';
 
   @override
+  String get attChainLabel => 'السلسلة';
+
+  @override
+  String get attBranchLabel => 'الفرع';
+
+  @override
+  String get attAllBranches => 'كل الفروع';
+
+  @override
+  String get attMonthProgressTitle => 'أيام الحضور من أيام الشغل';
+
+  @override
+  String attMonthProgress(int count, int total) {
+    return 'حضرت $count من $total يوم شغل';
+  }
+
+  @override
+  String get attDurationLabel => 'المدة';
+
+  @override
+  String get attCheckInLabel => 'الدخول';
+
+  @override
+  String get attCheckOutLabel => 'الخروج';
+
+  @override
+  String get notifKindAttention => 'محتاج انتباهك';
+
+  @override
+  String get notifKindDone => 'تم';
+
+  @override
+  String get notifKindChange => 'تغيير';
+
+  @override
+  String get notifKindWork => 'مطلوب منك';
+
+  @override
+  String get notifKindAttendance => 'حضور';
+
+  @override
+  String get notifKindInfo => 'معلومة';
+
+  @override
+  String get reqRejectReasonTitle => 'سبب الرفض';
+
+  @override
+  String get reqDecidedBy => 'الرد من';
+
+  @override
+  String reqHoursWord(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ساعة',
+      few: 'ساعات',
+      two: 'ساعتين',
+      one: 'ساعة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reqDaysWord(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'يوم',
+      few: 'أيام',
+      two: 'يومين',
+      one: 'يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reqDurationLabel => 'المدة';
+
+  @override
+  String get reqFilterPending => 'معلّق';
+
+  @override
+  String get photosCaptureAction => 'صوّر عرض';
+
+  @override
+  String get photoLoadFailed => 'تعذّر تحميل الصورة';
+
+  @override
+  String get photoPendingBanner =>
+      'الصورة لسه على الموبايل، وهتترفع أول ما النت يرجع.';
+
+  @override
+  String get photoBannerOk => 'تمام';
+
+  @override
+  String get photoShare => 'مشاركة';
+
+  @override
+  String get photoShareFailed => 'تعذّرت مشاركة الصورة';
+
+  @override
+  String get photoOpenMap => 'افتح على الخريطة';
+
+  @override
+  String get photoMapFailed => 'تعذّر فتح الخريطة';
+
+  @override
+  String get photoPrevious => 'الصورة السابقة';
+
+  @override
+  String get photoNext => 'الصورة التالية';
+
+  @override
+  String photoCounter(int index, int total) {
+    return '$index من $total';
+  }
+
+  @override
+  String photoSemantic(String branch, String time) {
+    return 'صورة في $branch، $time';
+  }
+
+  @override
+  String get profileWorkInfo => 'بيانات العمل';
+
+  @override
+  String get profileDelegateCode => 'كود المندوب';
+
+  @override
+  String get profileChains => 'السلاسل';
+
+  @override
+  String get profileCopy => 'نسخ';
+
+  @override
+  String get profileCopied => 'اتنسخ الكود';
+
+  @override
+  String get profileShowId => 'إظهار الرقم';
+
+  @override
+  String get profileHideId => 'إخفاء الرقم';
+
+  @override
+  String get taskStart => 'ابدأ المهمة';
+
+  @override
+  String get taskFinish => 'خلّصت المهمة';
+
+  @override
+  String get taskOverdueLabel => 'متأخرة';
+
+  @override
+  String taskOverdueBanner(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'المهمة دي متأخرة $count يوم',
+      few: 'المهمة دي متأخرة $count أيام',
+      two: 'المهمة دي متأخرة يومين',
+      one: 'المهمة دي متأخرة يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String taskDueInDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'بعد $count يوم',
+      few: 'بعد $count أيام',
+      two: 'بعد يومين',
+      one: 'بكرة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get taskProofSection => 'إثبات التنفيذ';
+
+  @override
+  String get taskFrom => 'من';
+
+  @override
+  String get taskAssignedToLabel => 'لمين';
+
+  @override
+  String get taskAssignedAll => 'كل المناديب';
+
+  @override
+  String get taskSentAt => 'اتبعتت';
+
+  @override
+  String get taskDoneAt => 'اتنفذت';
+
+  @override
+  String get tasksFilterOpen => 'المفتوحة';
+
+  @override
+  String get tasksFilterDone => 'المنجزة';
+
+  @override
+  String get tasksGroupOverdue => 'متأخرة';
+
+  @override
+  String get tasksGroupOpen => 'الجاية';
+
+  @override
+  String get tasksGroupDone => 'خلصت';
+
+  @override
+  String taskLateBy(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'متأخرة $count يوم',
+      few: 'متأخرة $count أيام',
+      two: 'متأخرة يومين',
+      one: 'متأخرة يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get captureStepPlace => 'المكان';
+
+  @override
+  String get captureStepPhotos => 'الصور';
+
+  @override
+  String capturePermissionUntil(String date) {
+    return 'الإذن ساري لحد $date';
+  }
+
+  @override
+  String get captureTapToReview =>
+      'دوس على أي صورة علشان تشوفها كبيرة، أو تعيدها، أو تمسحها.';
+
+  @override
+  String get settingsAppearance => 'المظهر';
+
+  @override
+  String get settingsAuto => 'تلقائي';
+
+  @override
+  String get settingsContrast => 'التباين';
+
+  @override
+  String get settingsContrastHint => 'للنص والحدود. «عالي» أوضح في الشمس.';
+
+  @override
+  String get settingsContrastStandard => 'عادي';
+
+  @override
+  String get settingsContrastMedium => 'متوسط';
+
+  @override
+  String get settingsContrastHigh => 'عالي';
+
+  @override
+  String get settingsColorHint => 'كل ألوان التطبيق بتتولّد من اللون ده.';
+
+  @override
+  String get settingsAbout => 'عن التطبيق';
+
+  @override
+  String get feedbackOpen => 'مفتوحة';
+
+  @override
+  String get feedbackAnswered => 'اتردّ عليها';
+
+  @override
+  String get feedbackSentAt => 'اتبعتت';
+
+  @override
+  String get feedbackHasAnswer => 'فيه رد';
+
+  @override
+  String get feedbackNoAnswer => 'لسه';
+
+  @override
+  String get feedbackYourMessage => 'رسالتك';
+
+  @override
+  String get feedbackScreenshot => 'الصورة المرفقة';
+
+  @override
+  String get feedbackNoAnswerYet =>
+      'لسه مفيش رد. هيوصلك إشعار أول ما الإدارة ترد.';
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override

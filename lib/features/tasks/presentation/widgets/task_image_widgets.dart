@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -120,16 +122,26 @@ class _TaskImageThumbnailState extends State<TaskImageThumbnail> {
                         const SizedBox(height: 4),
                         Text(
                           l10n.taskImageLoadFailed,
-                          style: TextStyle(color: scheme.onSurfaceVariant),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        TextButton.icon(
+                          key: const Key('task_image_retry'),
+                          onPressed: () => setState(() => _bytes = _load()),
+                          icon: const Icon(Symbols.refresh_rounded),
+                          label: Text(l10n.retry),
                         ),
                       ],
                     ),
                   ),
                 );
               }
-              return SizedBox(
+              // Loading: a skeleton the size of the image (TAS-387).
+              return Skeleton(
+                key: const Key('task_image_skeleton'),
+                radius: 0,
+                width: double.infinity,
                 height: widget.height,
-                child: const Center(child: CircularProgressIndicator()),
               );
             },
           ),
@@ -140,7 +152,7 @@ class _TaskImageThumbnailState extends State<TaskImageThumbnail> {
 }
 
 /// Full-screen, pinch-to-zoom viewer for a task image.
-class TaskImageViewer extends StatelessWidget {
+class TaskImageViewer extends StatefulWidget {
   const TaskImageViewer({super.key, required this.bytes});
 
   final Uint8List bytes;
@@ -155,26 +167,60 @@ class TaskImageViewer extends StatelessWidget {
   }
 
   @override
+  State<TaskImageViewer> createState() => _TaskImageViewerState();
+}
+
+/// Same behaviour as the photo details page (TAS-387): the image on the
+/// scrim with light status bar icons, pinch to zoom, double tap ×2.
+class _TaskImageViewerState extends State<TaskImageViewer> {
+  final _zoom = TransformationController();
+  Offset _tapAt = Offset.zero;
+
+  @override
+  void dispose() {
+    _zoom.dispose();
+    super.dispose();
+  }
+
+  void _doubleTap() {
+    if (_zoom.value.getMaxScaleOnAxis() > 1.01) {
+      _zoom.value = Matrix4.identity();
+    } else {
+      const s = 2.0;
+      _zoom.value = Matrix4.identity()
+        ..translateByDouble(-_tapAt.dx * (s - 1), -_tapAt.dy * (s - 1), 0, 1)
+        ..scaleByDouble(s, s, 1, 1);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
-    // A viewer reads best on the dark inverse surface in both modes.
-    return Scaffold(
-      backgroundColor: scheme.inverseSurface,
-      appBar: AppBar(
-        backgroundColor: scheme.inverseSurface,
-        foregroundColor: scheme.onInverseSurface,
-        leading: IconButton(
-          tooltip: l10n.taskCloseImage,
-          icon: const Icon(Symbols.close_rounded),
-          onPressed: () => Navigator.of(context).pop(),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: scheme.scrim,
+        appBar: AppBar(
+          backgroundColor: scheme.scrim,
+          foregroundColor: scheme.surface,
+          leading: IconButton(
+            tooltip: l10n.taskCloseImage,
+            icon: const Icon(Symbols.close_rounded),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ),
-      ),
-      body: Center(
-        child: InteractiveViewer(
-          minScale: 1,
-          maxScale: 5,
-          child: Image.memory(bytes, fit: BoxFit.contain),
+        body: GestureDetector(
+          onDoubleTapDown: (d) => _tapAt = d.localPosition,
+          onDoubleTap: _doubleTap,
+          child: Center(
+            child: InteractiveViewer(
+              transformationController: _zoom,
+              minScale: 1,
+              maxScale: 5,
+              child: Image.memory(widget.bytes, fit: BoxFit.contain),
+            ),
+          ),
         ),
       ),
     );

@@ -405,7 +405,336 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   ),
               ],
             ),
-            body: SingleChildScrollView(
+            // TAS-387: the sender's edit form is unchanged; everyone else
+            // reads the task as content, not as a form.
+            body: _isEditing
+                ? _buildEditForm(context, l10n, theme)
+                : _buildReadView(context, l10n, theme),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Days a still-open task is past its due date (0 when on time).
+  int get _overdueDays {
+    if (_currentStatus == TaskStatus.completed ||
+        _currentStatus == TaskStatus.cancelled) {
+      return 0;
+    }
+    final today = DateUtils.dateOnly(DateTime.now());
+    final due = DateUtils.dateOnly(_dueDate);
+    return due.isBefore(today) ? today.difference(due).inDays : 0;
+  }
+
+  /// The delegate's next step (TAS-387): start a pending task, finish one
+  /// in progress. Cancelling is the sender's call [UI only; the rules still
+  /// accept any status from the assignee, USER-ROLES-LOGIC 5.10].
+  TaskStatus? get _nextStatus => switch (_task.status) {
+    TaskStatus.pending => TaskStatus.inProgress,
+    TaskStatus.inProgress => TaskStatus.completed,
+    _ => null,
+  };
+
+  bool get _notesChanged => _notesController.text != (_task.notes ?? '');
+
+  /// Read view (TAS-387, user review 27 Nov 2026): the task as content.
+  /// Title and labels, the description as text, the images, the facts as a
+  /// list (C-23), «إثبات التنفيذ» (proofs + notes), and for the assignee
+  /// one button with the next step. An overdue task shows a banner.
+  Widget _buildReadView(
+    BuildContext context,
+    AppLocalizations l10n,
+    ThemeData theme,
+  ) {
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
+    final sem = theme.extension<TashilSemanticColors>();
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final overdue = _overdueDays;
+    final next = widget.isAdmin ? null : _nextStatus;
+
+    Widget label(String text, Color bg, Color fg, IconData icon, {Key? key}) =>
+        Container(
+          key: key,
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: TashilSpacing.sm,
+            vertical: TashilSpacing.xs / 2,
+          ),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(TashilRadius.small),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: fg),
+              const SizedBox(width: TashilSpacing.xs),
+              Text(text, style: tt.labelMedium?.copyWith(color: fg)),
+            ],
+          ),
+        );
+
+    final (Color sBg, Color sFg) = switch (_currentStatus) {
+      TaskStatus.pending => (cs.surfaceContainerHighest, cs.onSurfaceVariant),
+      TaskStatus.inProgress => (cs.secondaryContainer, cs.onSecondaryContainer),
+      TaskStatus.completed => (
+        sem?.successContainer ?? cs.primaryContainer,
+        sem?.onSuccessContainer ?? cs.onPrimaryContainer,
+      ),
+      TaskStatus.cancelled => (cs.surfaceContainerHighest, cs.onSurfaceVariant),
+    };
+
+    Widget fact(IconData icon, String title, String value, {Key? key}) =>
+        ListTile(
+          key: key,
+          leading: Icon(icon, color: cs.primary),
+          title: Text(value, style: tt.bodyLarge),
+          subtitle: Text(
+            title,
+            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        );
+
+    String dueText() {
+      final date = DateFormat('EEEE، d MMMM', locale).format(_dueDate);
+      final today = DateUtils.dateOnly(DateTime.now());
+      final days = DateUtils.dateOnly(_dueDate).difference(today).inDays;
+      final rel = days == 0
+          ? l10n.today
+          : days > 0
+          ? l10n.taskDueInDays(days)
+          : l10n.taskOverdueLabel;
+      return '$date • $rel';
+    }
+
+    final facts = <Widget>[
+      fact(
+        Symbols.event_rounded,
+        l10n.taskDueDate,
+        dueText(),
+        key: const Key('task_due_fact'),
+      ),
+      if (_task.createdByName.trim().isNotEmpty)
+        fact(
+          Symbols.person_rounded,
+          l10n.taskFrom,
+          _task.createdByName.trim(),
+        ),
+      fact(
+        Symbols.group_rounded,
+        l10n.taskAssignedToLabel,
+        _task.assignedTo == 'all'
+            ? l10n.taskAssignedAll
+            : _task.assignedToName,
+      ),
+      fact(
+        Symbols.schedule_send_rounded,
+        l10n.taskSentAt,
+        DateFormat('d MMMM • h:mm a', locale).format(_task.createdAt),
+      ),
+      if (_task.completedAt != null)
+        fact(
+          Symbols.task_alt_rounded,
+          l10n.taskDoneAt,
+          DateFormat('d MMMM • h:mm a', locale).format(_task.completedAt!),
+        ),
+    ];
+
+    final proofs = _buildProofSection(l10n, theme, ownLabel: false);
+    final notesEditable = !widget.isAdmin &&
+        _currentStatus != TaskStatus.cancelled;
+    final hasNotes = (_task.notes ?? '').trim().isNotEmpty;
+
+    return ListView(
+      key: const Key('task_read_view'),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        TashilSpacing.page,
+        TashilSpacing.sm,
+        TashilSpacing.page,
+        TashilSpacing.xxl,
+      ),
+      children: [
+        if (overdue > 0)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(bottom: TashilSpacing.md),
+            child: MaterialBanner(
+              key: const Key('task_overdue_banner'),
+              backgroundColor: cs.errorContainer,
+              leading: Icon(Symbols.alarm_rounded, color: cs.onErrorContainer),
+              content: Text(
+                l10n.taskOverdueBanner(overdue),
+                style: tt.bodyMedium?.copyWith(color: cs.onErrorContainer),
+              ),
+              actions: const [SizedBox.shrink()],
+            ),
+          ),
+        Text(
+          _task.title,
+          key: const Key('task_title'),
+          style: tt.titleLarge,
+          textDirection: Bidi.hasAnyRtl(_task.title)
+              ? TextDirection.rtl
+              : TextDirection.ltr,
+        ),
+        const SizedBox(height: TashilSpacing.sm),
+        Wrap(
+          spacing: TashilSpacing.sm,
+          runSpacing: TashilSpacing.xs,
+          children: [
+            label(
+              _getStatusName(l10n, _currentStatus),
+              sBg,
+              sFg,
+              _getStatusIcon(_currentStatus).icon!,
+              key: const Key('task_status_label'),
+            ),
+            label(
+              _getPriorityName(l10n, _currentPriority),
+              _currentPriority == TaskPriority.high
+                  ? cs.tertiaryContainer
+                  : cs.surfaceContainerHighest,
+              _currentPriority == TaskPriority.high
+                  ? cs.onTertiaryContainer
+                  : cs.onSurfaceVariant,
+              _getPriorityIcon(_currentPriority).icon!,
+            ),
+            if (overdue > 0)
+              label(
+                l10n.taskOverdueLabel,
+                cs.errorContainer,
+                cs.onErrorContainer,
+                Symbols.alarm_rounded,
+                key: const Key('task_overdue_label'),
+              ),
+            if (_task.isEdited) const TaskEditedLabel(),
+          ],
+        ),
+        if (_task.description.trim().isNotEmpty) ...[
+          const SizedBox(height: TashilSpacing.lg),
+          Text(
+            _task.description,
+            style: tt.bodyLarge,
+            textDirection: Bidi.hasAnyRtl(_task.description)
+                ? TextDirection.rtl
+                : TextDirection.ltr,
+          ),
+        ],
+        if (_task.hasImage) ...[
+          const SizedBox(height: TashilSpacing.lg),
+          TaskImageGallery(
+            key: ValueKey(
+              'view-$_imageViewEpoch-${_task.resolvedImagePaths.join(",")}',
+            ),
+            imagePaths: _task.resolvedImagePaths,
+            taskId: _task.uid,
+            organizationId: widget.organizationId,
+          ),
+        ],
+        const SizedBox(height: TashilSpacing.lg),
+        Card.filled(
+          key: const Key('task_facts'),
+          margin: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (var i = 0; i < facts.length; i++) ...[
+                if (i > 0)
+                  const Divider(height: 1, indent: TashilSpacing.xxl * 2),
+                facts[i],
+              ],
+            ],
+          ),
+        ),
+        if (proofs.isNotEmpty || notesEditable || hasNotes) ...[
+          const SizedBox(height: TashilSpacing.xl),
+          Row(
+            children: [
+              Icon(Symbols.fact_check_rounded, size: 20, color: cs.primary),
+              const SizedBox(width: TashilSpacing.sm),
+              Text(l10n.taskProofSection, style: tt.titleSmall),
+            ],
+          ),
+          ...proofs,
+          const SizedBox(height: TashilSpacing.md),
+          if (notesEditable)
+            TextFormField(
+              key: const Key('task_notes_field'),
+              controller: _notesController,
+              minLines: 2,
+              maxLines: null,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                labelText: l10n.notes,
+                hintText: l10n.notesHint,
+              ),
+              keyboardType: TextInputType.multiline,
+            )
+          else if (hasNotes)
+            Card.outlined(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                leading: Icon(Symbols.notes_rounded, color: cs.primary),
+                title: Text(_task.notes!.trim(), style: tt.bodyLarge),
+                subtitle: Text(
+                  l10n.notes,
+                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            ),
+        ],
+        const SizedBox(height: TashilSpacing.xl),
+        if (next != null)
+          FilledButton.icon(
+            key: Key(
+              next == TaskStatus.completed
+                  ? 'taskCompleteButton'
+                  : 'taskStartButton',
+            ),
+            onPressed: _proofUploading
+                ? null
+                : () {
+                    setState(() => _currentStatus = next);
+                    _saveChanges(context);
+                  },
+            icon: Icon(
+              next == TaskStatus.completed
+                  ? Symbols.task_alt_rounded
+                  : Symbols.play_arrow_rounded,
+            ),
+            label: Text(
+              next == TaskStatus.completed ? l10n.taskFinish : l10n.taskStart,
+            ),
+          ),
+        if ((_notesChanged && notesEditable) ||
+            (_canEditOwnProofs && _proofsChanged && !_proofUploading)) ...[
+          const SizedBox(height: TashilSpacing.sm),
+          FilledButton.tonalIcon(
+            key: const Key('task_save_button'),
+            onPressed: () => _saveChanges(context),
+            icon: const Icon(Symbols.save_rounded),
+            label: Text(l10n.saveChanges),
+          ),
+        ],
+        if (_isSender) ...[
+          const SizedBox(height: TashilSpacing.lg),
+          OutlinedButton.icon(
+            onPressed: () => _confirmDelete(context),
+            icon: const Icon(Symbols.delete_rounded),
+            label: Text(l10n.deleteTask),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// The sender's edit form (TAS-356 layout, unchanged).
+  Widget _buildEditForm(
+    BuildContext context,
+    AppLocalizations l10n,
+    ThemeData theme,
+  ) {
+    return SingleChildScrollView(
               padding: const EdgeInsetsDirectional.symmetric(
                 horizontal: TashilSpacing.page,
                 vertical: TashilSpacing.sm,
@@ -700,11 +1029,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   ],
                 ],
               ),
-            ),
-          );
-        },
-      ),
-    );
+            );
   }
 
   /// A read-only value on the screen's one card style (TAS-356).
@@ -718,6 +1043,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   Widget _buildField({required String label, required Widget child}) {
     final theme = Theme.of(context);
+    if (label.isEmpty) return child;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -749,7 +1075,12 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     }
   }
 
-  List<Widget> _buildProofSection(AppLocalizations l10n, ThemeData theme) {
+  /// [ownLabel]: false under the read view's «إثبات التنفيذ» title.
+  List<Widget> _buildProofSection(
+    AppLocalizations l10n,
+    ThemeData theme, {
+    bool ownLabel = true,
+  }) {
     final others = [
       for (final proof in _visibleProofs)
         if (proof.imagePaths.isNotEmpty) proof,
@@ -779,7 +1110,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     if (showOwnEditor) {
       children.add(
         _buildField(
-          label: l10n.taskProofTitle,
+          label: ownLabel ? l10n.taskProofTitle : '',
           child: TaskImagePickerList(
             key: ValueKey('proof-edit-$_proofViewEpoch'),
             organizationId: widget.organizationId,

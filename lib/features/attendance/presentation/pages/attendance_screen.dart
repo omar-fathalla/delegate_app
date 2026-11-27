@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -14,9 +15,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/config/theme/app_theme.dart';
+import 'package:delegate_app/core/design/bidi.dart';
 import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/design/widgets/dialogs.dart';
 import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+import 'package:delegate_app/core/design/widgets/summary_card.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
@@ -39,7 +42,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+import 'package:intl/intl.dart' hide Bidi, TextDirection;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -92,6 +95,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Map<String, List<Attendance>> _groupedByDay = {};
   List<String> _dayKeys = [];
   String _chainFilter = 'all'; // 'all' or normalized chain name
+  // TAS-387: second level of the filter (branch inside the chosen chain).
+  String _branchFilter = 'all';
+  List<String> _availableBranches = [];
   int _allAttendedDaysCount = 0;
 
   /// All sessions of [_monthSessionsFor] (whole month, not the loaded page).
@@ -181,6 +187,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
     return _formatChainName(raw, branchName: branchName, isArabic: isArabic);
   }
+
+  /// The selected month's sessions are still on their way (month switch):
+  /// numbers and days show skeletons until they land (TAS-387).
+  bool get _monthLoading =>
+      sl.isRegistered<GetHistoryForMonth>() && !_hasMonthSessionsForSelected;
 
   bool get _hasMonthSessionsForSelected =>
       _monthSessions != null &&
@@ -593,6 +604,23 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       return itemChain == _chainFilter;
     }).toList();
 
+    // TAS-387: branches seen in the chosen chain this month, then the
+    // branch filter on top of the chain filter.
+    final branches = <String>[];
+    for (final a in _filteredHistory) {
+      final b = _cleanBranchName(a.branchName ?? '');
+      if (b.isNotEmpty && !branches.contains(b)) branches.add(b);
+    }
+    _availableBranches = branches;
+    if (_branchFilter != 'all' && !branches.contains(_branchFilter)) {
+      _branchFilter = 'all';
+    }
+    if (_branchFilter != 'all') {
+      _filteredHistory = _filteredHistory
+          .where((a) => _cleanBranchName(a.branchName ?? '') == _branchFilter)
+          .toList();
+    }
+
     _filteredHistory.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
 
     _groupedByDay = {};
@@ -948,12 +976,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             )
           : AppLocalizations.of(context)!.attInsideZone;
     } else {
-      statusColor = semantic?.warning ?? colorScheme.tertiary;
-      onStatusColor = semantic?.onWarning ?? colorScheme.onTertiary;
-      statusContainer =
-          semantic?.warningContainer ?? colorScheme.tertiaryContainer;
-      onStatusContainer =
-          semantic?.onWarningContainer ?? colorScheme.onTertiaryContainer;
+      // TAS-387: outside the zone blocks check-in, so it is an error state
+      // (user decision 27 Nov; F-04 updated: a state that blocks an action).
+      statusColor = colorScheme.error;
+      onStatusColor = colorScheme.onError;
+      statusContainer = colorScheme.errorContainer;
+      onStatusContainer = colorScheme.onErrorContainer;
       headerIcon = Symbols.wrong_location_rounded;
       statusTitle = AppLocalizations.of(context)!.attOutsideZone;
       statusSubtitle = activeBranch != null
@@ -983,7 +1011,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               : 150)
         : null;
 
-    final rtl = Directionality.of(context) == TextDirection.rtl;
     void goToMonth(DateTime month) {
       setState(() {
         _selectedMonth = month;
@@ -1009,8 +1036,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             children: [
               Icon(icon, size: 24, color: colorScheme.onSurfaceVariant),
               const SizedBox(height: TashilSpacing.xs),
-              AnimatedSwitcher(
-                duration: AppMotionDurations.short4,
+              SkeletonSwitcher(
+                loading: _monthLoading,
+                skeleton: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: TashilSpacing.xs),
+                  child: Skeleton(width: 40, height: 24),
+                ),
                 child: Text(
                   '$value',
                   key: ValueKey(value),
@@ -1068,11 +1099,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   onPressed: () => goToMonth(
                     DateTime(_selectedMonth.year, _selectedMonth.month - 1),
                   ),
-                  icon: Icon(
-                    rtl
-                        ? Symbols.chevron_right_rounded
-                        : Symbols.chevron_left_rounded,
-                  ),
+                  // TAS-387: Symbols chevrons mirror by themselves in RTL; the
+                  // extra swap here pointed both arrows inward.
+                  icon: const Icon(Symbols.chevron_left_rounded),
                 ),
                 Expanded(
                   child: Column(
@@ -1106,11 +1135,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   onPressed: () => goToMonth(
                     DateTime(_selectedMonth.year, _selectedMonth.month + 1),
                   ),
-                  icon: Icon(
-                    rtl
-                        ? Symbols.chevron_left_rounded
-                        : Symbols.chevron_right_rounded,
-                  ),
+                  icon: const Icon(Symbols.chevron_right_rounded),
                 ),
               ],
             ),
@@ -1136,6 +1161,52 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ),
               ],
             ),
+            // TAS-387 (playground: progress indicators): how far into the
+            // month's work days the delegate is.
+            const SizedBox(height: TashilSpacing.md),
+            Semantics(
+              label: AppLocalizations.of(context)!.attMonthProgress(
+                attendedDays,
+                MonthlyAttendanceStats.workDaysPerMonth,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          AppLocalizations.of(context)!.attMonthProgressTitle,
+                          style: textTheme.labelLarge,
+                        ),
+                      ),
+                      SkeletonSwitcher(
+                        loading: _monthLoading,
+                        skeleton: const Skeleton(width: 40, height: 14),
+                        child: Text(
+                          Bidi.ltr(
+                            '$attendedDays / ${MonthlyAttendanceStats.workDaysPerMonth}',
+                          ),
+                          style: textTheme.labelLarge?.copyWith(
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: TashilSpacing.xs),
+                  if (_monthLoading)
+                    const Skeleton(height: 4)
+                  else
+                    LinearProgressIndicator(
+                      key: const Key('attendance_month_progress'),
+                      value: (attendedDays /
+                              MonthlyAttendanceStats.workDaysPerMonth)
+                          .clamp(0.0, 1.0),
+                    ),
+                ],
+              ),
+            ),
             const SizedBox(height: TashilSpacing.sm),
             infoLabel(
               Symbols.info_rounded,
@@ -1158,13 +1229,28 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   children: [
                     Row(
                       children: [
-                        _GeofenceRadarWidget(
-                          animation: _radarAnimation,
-                          isInside: _isInsideGeofence,
-                          isChecking: isBusy,
-                          statusColor: statusColor,
-                          onStatusColor: onStatusColor,
-                        ),
+                        // Looking for the location: the kit loading
+                        // indicator (unknown wait, playground «مؤشر
+                        // التحميل», TAS-387); the radar shows the result.
+                        if (isBusy)
+                          const SizedBox.square(
+                            dimension: 72,
+                            child: Center(
+                              child: LoadingIndicator(
+                                key: Key('attendance_locating'),
+                                size: 56,
+                                contained: true,
+                              ),
+                            ),
+                          )
+                        else
+                          _GeofenceRadarWidget(
+                            animation: _radarAnimation,
+                            isInside: _isInsideGeofence,
+                            isChecking: false,
+                            statusColor: statusColor,
+                            onStatusColor: onStatusColor,
+                          ),
                         const SizedBox(width: TashilSpacing.md),
                         Expanded(
                           child: Column(
@@ -1230,9 +1316,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       ],
                     ),
                     const SizedBox(height: TashilSpacing.sm),
-                    Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: OutlinedButton.icon(
+                    // TAS-387: an action, so a full-width tonal button.
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonalIcon(
+                        key: const Key('attendance_recheck_button'),
                         onPressed: isBusy
                             ? null
                             : () => _detectNearestBranch(
@@ -1300,53 +1388,73 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
           ];
 
-    // TAS-352 (C-06): filtering a list is a single-select set of official
-    // FilterChips in one scrolling row (docs/design/design-system.md >
-    // Chips), the same for one chain or many; no hand-drawn pills, shadows
-    // or per-chain colours.
-    Widget chip({
-      required String filterKey,
-      required String label,
-      required int count,
-    }) {
-      final selected = _chainFilter == filterKey;
-      return FilterChip(
-        key: ValueKey('attendance_chain_filter_$filterKey'),
-        selected: selected,
-        showCheckmark: true,
-        label: Text('$label · $count'),
-        onSelected: (_) {
-          if (_chainFilter != filterKey) {
-            setState(() {
-              _chainFilter = filterKey;
-              _recomputeFilteredHistory();
-            });
-          }
-        },
-      );
+    // TAS-387: chain then branch, as two DropdownMenus (the chain one can be
+    // typed into to search). A delegate can work in many chains, so a row of
+    // chips did not scale. Hidden when there is nothing to choose.
+    final l10n = AppLocalizations.of(context)!;
+    if (chains.length <= 1 && _availableBranches.length <= 1) {
+      return const SizedBox(height: TashilSpacing.sm);
     }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsetsDirectional.symmetric(
-        horizontal: TashilSpacing.xs,
         vertical: TashilSpacing.sm,
       ),
       child: Row(
         children: [
-          chip(
-            filterKey: 'all',
-            label: AppLocalizations.of(context)!.allChains,
-            count: _allAttendedDaysCount,
-          ),
-          for (final chainKey in chains) ...[
-            const SizedBox(width: TashilSpacing.sm),
-            chip(
-              filterKey: chainKey,
-              label: _formatChainName(chainKey, isArabic: isArabic),
-              count: _chainDaysCount[chainKey] ?? 0,
+          Expanded(
+            child: DropdownMenu<String>(
+              key: const Key('attendance_chain_menu'),
+              initialSelection: _chainFilter,
+              expandedInsets: EdgeInsets.zero,
+              enableFilter: true,
+              requestFocusOnTap: chains.length > 6,
+              leadingIcon: const Icon(Symbols.storefront_rounded),
+              label: Text(l10n.attChainLabel),
+              dropdownMenuEntries: [
+                DropdownMenuEntry(
+                  value: 'all',
+                  label: '${l10n.allChains} · $_allAttendedDaysCount',
+                ),
+                for (final c in chains)
+                  DropdownMenuEntry(
+                    value: c,
+                    label:
+                        '${_formatChainName(c, isArabic: isArabic)} · ${_chainDaysCount[c] ?? 0}',
+                  ),
+              ],
+              onSelected: (v) {
+                if (v == null || v == _chainFilter) return;
+                setState(() {
+                  _chainFilter = v;
+                  _branchFilter = 'all';
+                  _recomputeFilteredHistory();
+                });
+              },
             ),
-          ],
+          ),
+          const SizedBox(width: TashilSpacing.sm),
+          Expanded(
+            child: DropdownMenu<String>(
+              key: ValueKey('attendance_branch_menu_$_chainFilter'),
+              initialSelection: _branchFilter,
+              expandedInsets: EdgeInsets.zero,
+              requestFocusOnTap: false,
+              leadingIcon: const Icon(Symbols.location_on_rounded),
+              label: Text(l10n.attBranchLabel),
+              dropdownMenuEntries: [
+                DropdownMenuEntry(value: 'all', label: l10n.attAllBranches),
+                for (final b in _availableBranches)
+                  DropdownMenuEntry(value: b, label: b),
+              ],
+              onSelected: (v) {
+                if (v == null || v == _branchFilter) return;
+                setState(() {
+                  _branchFilter = v;
+                  _recomputeFilteredHistory();
+                });
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -1409,7 +1517,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               isArabic: isArabic,
             );
 
-      if (_dayKeys.isEmpty) {
+      if (_dayKeys.isEmpty && !_monthLoading) {
         return M3Refresh(
           onRefresh: () async {
             if (_isGeofenceMode) {
@@ -1543,13 +1651,23 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             top: TashilSpacing.md,
             bottom: 80,
           ),
-          itemCount: _dayKeys.length + 2 + (state.hasReachedMax ? 0 : 1),
+          itemCount: _monthLoading
+              ? 2 + 3
+              : _dayKeys.length + 2 + (state.hasReachedMax ? 0 : 1),
           itemBuilder: (context, index) {
             if (index == 0) {
               return _buildUnifiedAttendanceCard(context);
             }
             if (index == 1) {
               return _buildChainFilterBar(context);
+            }
+            if (_monthLoading) {
+              return const Padding(
+                padding: EdgeInsetsDirectional.symmetric(
+                  horizontal: TashilSpacing.page,
+                ),
+                child: SummaryCardSkeleton(),
+              );
             }
             final dayIndex = index - 2;
             if (dayIndex >= _dayKeys.length) {
@@ -1638,167 +1756,66 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     final diff = effectiveOut.difference(item.checkInTime);
                     final hours = diff.inHours;
                     final minutes = diff.inMinutes.remainder(60);
-                    durationStr = l10n.duration('$hours', '$minutes');
+                    // TAS-387: hh:mm, digits only, kept LTR in Arabic.
+                    durationStr = Bidi.ltr(
+                      '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}',
+                    );
                   } else {
                     durationStr = l10n.inProgress;
                   }
 
-                  // TAS-352: one Card.filled per session, text from the
-                  // textTheme, one neutral chain label (no per-chain
-                  // colours), check-out is not an error colour.
-                  final tt = Theme.of(context).textTheme;
+                  // TAS-387: the session as a SummaryCard (P-07): branch and
+                  // chain, the duration large on the end side, then check-in
+                  // and check-out across the card.
                   final warn = Theme.of(context)
                       .extension<TashilSemanticColors>();
-                  return Card.filled(
-                    margin: const EdgeInsetsDirectional.only(
-                      bottom: TashilSpacing.md,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(TashilSpacing.lg),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Symbols.location_on_rounded,
-                                      size: 16,
-                                      color: colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: TashilSpacing.xs),
-                                    Expanded(
-                                      child: Text(
-                                        AppLocalizations.of(context)!
-                                            .branchLabel(cleanBranchName),
-                                        style: tt.titleSmall?.copyWith(
-                                          color: colorScheme.onSurface,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (chainName.isNotEmpty) ...[
-                                  const SizedBox(height: TashilSpacing.xs),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Symbols.storefront_rounded,
-                                        size: 14,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(width: TashilSpacing.xs),
-                                      Flexible(
-                                        child: Text(
-                                          chainName,
-                                          style: tt.labelMedium?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                                const SizedBox(height: TashilSpacing.sm),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Symbols.login_rounded,
-                                      size: 16,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: TashilSpacing.xs),
-                                    Text(
-                                      l10n.inLabel(inTime),
-                                      style: tt.bodyMedium,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: TashilSpacing.xs),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      item.isEffectiveAutoCheckOut
-                                          ? Symbols.auto_mode_rounded
-                                          : Symbols.logout_rounded,
-                                      size: 16,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: TashilSpacing.xs),
-                                    Text(
-                                      l10n.outLabel(outTime),
-                                      style: tt.bodyMedium,
-                                    ),
-                                    if (item.isEffectiveAutoCheckOut) ...[
-                                      const SizedBox(width: TashilSpacing.sm),
-                                      Tooltip(
-                                        message: AppLocalizations.of(context)!
-                                            .attAutoClosedNote,
-                                        child: _statusLabel(
-                                          context,
-                                          AppLocalizations.of(context)!
-                                              .autoClosedAuto,
-                                          colorScheme.tertiaryContainer,
-                                          colorScheme.onTertiaryContainer,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: TashilSpacing.sm),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Symbols.timer_rounded,
-                                      size: 14,
-                                      color: effectiveOut != null
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: TashilSpacing.xs),
-                                    Text(
-                                      durationStr,
-                                      style: tt.labelLarge?.copyWith(
-                                        color: effectiveOut != null
-                                            ? colorScheme.primary
-                                            : colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                  return SummaryCard(
+                    icon: Symbols.storefront_rounded,
+                    title: cleanBranchName,
+                    subtitle: chainName,
+                    trailingValue: durationStr,
+                    trailingCaption: l10n.attDurationLabel,
+                    trailingIcon: Symbols.timer_rounded,
+                    trailingMuted: effectiveOut == null,
+                    labels: [
+                      if (item.isActive)
+                        SummaryLabel(
+                          l10n.active,
+                          container: colorScheme.tertiaryContainer,
+                          onContainer: colorScheme.onTertiaryContainer,
+                        ),
+                      if (item.isEffectiveAutoCheckOut)
+                        Tooltip(
+                          message: l10n.attAutoClosedNote,
+                          child: SummaryLabel(
+                            l10n.autoClosedAuto,
+                            container: colorScheme.tertiaryContainer,
+                            onContainer: colorScheme.onTertiaryContainer,
                           ),
-                          if (!item.isSynced)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(
-                                end: TashilSpacing.sm,
-                              ),
-                              child: Tooltip(
-                                message: l10n.pendingSync,
-                                child: Icon(
-                                  Symbols.cloud_off_rounded,
-                                  color: warn?.warning ??
-                                      colorScheme.onSurfaceVariant,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          if (item.isActive)
-                            _statusLabel(
-                              context,
-                              l10n.active,
-                              colorScheme.tertiaryContainer,
-                              colorScheme.onTertiaryContainer,
-                            ),
-                        ],
+                        ),
+                      if (!item.isSynced)
+                        SummaryLabel(
+                          l10n.pendingSync,
+                          container: warn?.warningContainer ??
+                              colorScheme.surfaceContainerHighest,
+                          onContainer: warn?.onWarningContainer ??
+                              colorScheme.onSurfaceVariant,
+                        ),
+                    ],
+                    facts: [
+                      SummaryFact(
+                        icon: Symbols.login_rounded,
+                        label: l10n.attCheckInLabel,
+                        value: inTime,
                       ),
-                    ),
+                      SummaryFact(
+                        icon: item.isEffectiveAutoCheckOut
+                            ? Symbols.auto_mode_rounded
+                            : Symbols.logout_rounded,
+                        label: l10n.attCheckOutLabel,
+                        value: outTime,
+                      ),
+                    ],
                   );
                 }),
                 if (dayIndex < _dayKeys.length - 1) const Divider(height: 24),
@@ -2841,104 +2858,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
-  /// Shimmer skeleton that mimics the attendance history cards while loading.
+  /// First load: skeletons of the session cards (kit SummaryCardSkeleton,
+  /// playground «هيكل التحميل», TAS-387).
   Widget _buildShimmerSkeleton() {
     return ListView.builder(
-      padding: const EdgeInsetsDirectional.only(
-        top: 16,
-        bottom: 80,
-        start: 16,
-        end: 16,
+      key: const Key('attendance_skeleton'),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        TashilSpacing.page,
+        TashilSpacing.lg,
+        TashilSpacing.page,
+        80,
       ),
       itemCount: 5,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsetsDirectional.only(bottom: TashilSpacing.md),
-          child: _ShimmerCard(),
-        );
-      },
-    );
-  }
-}
-
-/// Animated shimmer card that mimics attendance history card layout.
-class _ShimmerCard extends StatefulWidget {
-  @override
-  State<_ShimmerCard> createState() => _ShimmerCardState();
-}
-
-class _ShimmerCardState extends State<_ShimmerCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildShimmerBar(width: 120, height: 12),
-                const SizedBox(height: TashilSpacing.md),
-                _buildShimmerBar(width: 180, height: 14),
-                const SizedBox(height: TashilSpacing.sm),
-                _buildShimmerBar(width: 160, height: 14),
-                const SizedBox(height: TashilSpacing.sm),
-                _buildShimmerBar(width: 100, height: 12),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildShimmerBar({required double width, required double height}) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final baseColor = colorScheme.surfaceContainerHigh;
-    final highlightColor = colorScheme.surface;
-
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(TashilRadius.small),
-            gradient: LinearGradient(
-              colors: [baseColor, highlightColor, baseColor],
-              stops: [
-                (_controller.value - 0.3).clamp(0.0, 1.0),
-                _controller.value,
-                (_controller.value + 0.3).clamp(0.0, 1.0),
-              ],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-        );
-      },
+      itemBuilder: (context, index) => const SummaryCardSkeleton(),
     );
   }
 }

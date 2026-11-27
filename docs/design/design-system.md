@@ -103,6 +103,19 @@ contrast button in the app bar cycles the three levels).
   lightness as the card and the circle fades. The only inverse case is a
   card that is itself `primary` (the home welcome card): its icon circle is
   the light container.
+- **Error colour (TAS-387, user decision 2026-11-27):** `error` /
+  `errorContainer` mark real errors and a state that blocks the person's
+  next action (outside the attendance zone blocks check-in). Values that
+  only inform (absence days, penalty totals) stay neutral.
+- **Notification kinds (user decision 2026-11-27, TAS-387):** each kind of
+  notification has its own colour family so the list reads at a glance:
+  needs attention (penalty, refused) `error`; done (approved, paid)
+  `success`; a change (attendance edited, reminder) `warning`; work (task,
+  photo permission) `primary`; attendance `secondary`; news (update,
+  announcement, support) `tertiary`. The type icon sits on the family's
+  strong colour with its `on` colour, and a small label in the family's
+  container names it. This is the one place card icons are not all
+  `primary`.
 - **Read-only labels are not chips:** a value the user cannot act on (the
   active organization next to the role, a status) is an icon + text label,
   never a chip, border, glow or pulsing animation.
@@ -373,6 +386,7 @@ spacing, density) and styles/spacing.
 | Text input | `TashilTextField` (official `TextField`, outlined from the theme) inside a `FormColumn` | Label always; required `*` + one `RequiredFieldsNote`; error replaces supporting text, with an error icon; numeric keyboard for numbers |
 | Search in a view (products, suppliers) | `TashilSearch` (official `SearchAnchor` + `SearchBar`) | Bar over the content it searches; full screen on compact, docked from 600dp; recent before typing, grouped results + filter chips while typing |
 | Search as a secondary action | `TashilSearch(asIconButton: true)` in the app bar | |
+| A record scanned in a list (attendance session, request, task, penalty) | `SummaryCard` (P-07) | Icon on `primary`, headline + subhead, one prominent value on the end side, label-over-value facts filling the width. Not for a single value (use a plain card) |
 | Contextual action (print receipt, share) | `ActionChip` with icon (assist) | Starts with a verb; below the main content; `.elevated` only over an image |
 | Filtering lists | `FilterChip` | One set is single- or multi-select, never both. `ChoiceChip` is not an M3 variant: do not use it |
 | Filter that opens options (category ▾) | `MenuFilterChip` | The whole chip opens the menu |
@@ -441,8 +455,17 @@ Live: playground tab "التنبيهات".
 - Linear: on the top edge of its container or under the app bar.
 - Short task started by a button (printing): small circular indicator
   inside the button, button disabled.
-- Pull to refresh: official `RefreshIndicator.noSpinner` + a contained
-  `LoadingIndicator` on top of the list.
+- Pull to refresh: `PullToRefresh` (P-09): official
+  `RefreshIndicator.noSpinner` + a contained `LoadingIndicator` on top of
+  the list. Flutter reports `snap` and never `refresh`, so the widget
+  treats `snap` as refreshing.
+- Known layout loading (a list of cards, the numbers of a summary):
+  `Skeleton` / `SummaryCardSkeleton` (P-08) in a `SkeletonSwitcher`, never
+  a placeholder `0` that later jumps. Unknown layout: `DelayedLoadingIndicator`.
+  A skeleton and an indicator never show together.
+- Searching for something (location, a branch): `LoadingIndicator` where the
+  result will appear; the button that started it shows the small circular
+  indicator and is disabled.
 - Progress indicators use the M3 2024 look (gap, stop dot, rounded ends):
   `ProgressIndicatorThemeData(year2023: false)` in the theme.
 - Not adopted: the optional Expressive *wavy* progress style. Flutter does
@@ -833,7 +856,7 @@ curve + duration from M3's "Convert springs to curves" table.
 | Lateral | Report tabs (sales, returns, expenses) | `PageTransitionSwitcher` + `TashilTransitions.sharedX` |
 | Top level | Navigation bar destinations | `PageTransitionSwitcher` + `FadeThroughTransition` |
 | Enter and exit | Dialogs and menus inside a screen | `showModal` + `FadeScaleTransitionConfiguration` |
-| Skeleton loaders | Syncing products, loading a report | Grey shapes where content will be, then fade to content |
+| Skeleton loaders | Syncing products, loading a report | `Skeleton` / `SummaryCardSkeleton` in a `SkeletonSwitcher` (P-08): grey shapes where content will be, then fade to content |
 
 **Rules**
 - Never hand-pick a curve or duration (`Curves.easeOutBack`, `200ms`).

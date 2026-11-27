@@ -1,16 +1,31 @@
-import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+import 'package:animations/animations.dart';
+import 'package:delegate_app/core/design/bidi.dart';
 import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/button_group.dart';
+import 'package:delegate_app/core/design/widgets/empty_state.dart';
+import 'package:delegate_app/core/design/widgets/pull_to_refresh.dart';
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
+import 'package:delegate_app/core/design/widgets/summary_card.dart';
 import 'package:delegate_app/core/widgets/app_photo_image.dart';
-import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/features/feedback/domain/entities/feedback_entity.dart';
 import 'package:delegate_app/features/feedback/presentation/bloc/feedback_bloc.dart';
 import 'package:delegate_app/features/feedback/presentation/bloc/feedback_event.dart';
 import 'package:delegate_app/features/feedback/presentation/bloc/feedback_state.dart';
+import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:intl/intl.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart' hide Bidi, TextDirection;
+import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 
+/// «ملاحظاتي» (TAS-387, user review 27 Nov 2026), built from the playground:
+/// a connected ButtonGroup filter (open / answered / all), each feedback as
+/// a SummaryCard (type, first line, status label, date and whether the
+/// admin answered), opened with a container transform into its details
+/// (full text, screenshot, the admin's answer). PullToRefresh, skeletons,
+/// EmptyState for empty and error, and an extended FAB for a new one.
 class MyFeedbacksScreen extends StatefulWidget {
   final Delegate delegate;
 
@@ -20,300 +35,336 @@ class MyFeedbacksScreen extends StatefulWidget {
   State<MyFeedbacksScreen> createState() => _MyFeedbacksScreenState();
 }
 
-class _MyFeedbacksScreenState extends State<MyFeedbacksScreen> {
+enum _Filter { open, answered, all }
+
+bool _isClosed(FeedbackStatus s) =>
+    s == FeedbackStatus.resolved || s == FeedbackStatus.rejected;
+
+class _MyFeedbacksScreenState extends State<MyFeedbacksScreen>
+    with ExtendedFabScroll {
+  _Filter _filter = _Filter.all;
+
   @override
   void initState() {
     super.initState();
-    context.read<FeedbackBloc>().add(
-      LoadUserFeedbacksEvent(userId: widget.delegate.uid),
+    _load();
+  }
+
+  void _load() => context.read<FeedbackBloc>().add(
+    LoadUserFeedbacksEvent(userId: widget.delegate.uid),
+  );
+
+  Future<void> _refresh() async {
+    final bloc = context.read<FeedbackBloc>();
+    final done = bloc.stream.firstWhere(
+      (s) => s is FeedbacksLoaded || s is FeedbackError,
     );
+    _load();
+    try {
+      await done.timeout(const Duration(seconds: 8));
+    } catch (_) {}
+  }
+
+  Future<void> _newFeedback() async {
+    await HrAccountPages.openSendFeedback(context, widget.delegate);
+    if (mounted) _load();
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.myFeedback),
-        centerTitle: true,
+      appBar: AppBar(title: Text(l10n.myFeedback)),
+      floatingActionButton: M3ExtendedFab(
+        key: const Key('feedback_new_fab'),
+        onPressed: _newFeedback,
+        icon: Symbols.add_comment_rounded,
+        label: l10n.sendFeedback,
+        extended: fabExtended,
       ),
-      body: BlocBuilder<FeedbackBloc, FeedbackState>(
-        builder: (context, state) {
-          if (state is FeedbackLoading) {
-            return const Center(child: LoadingIndicator());
-          }
-
-          if (state is FeedbackError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: theme.colorScheme.error,
-                  ),
-                  const SizedBox(height: TashilSpacing.lg),
-                  Text(
-                    state.message,
-                    style: theme.textTheme.bodyLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: TashilSpacing.lg),
-                  FilledButton.icon(
-                    onPressed: () {
-                      context.read<FeedbackBloc>().add(
-                        LoadUserFeedbacksEvent(userId: widget.delegate.uid),
-                      );
-                    },
-                    icon: const Icon(Icons.refresh),
-                    label: Text(AppLocalizations.of(context)!.retry),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (state is FeedbacksLoaded) {
-            if (state.feedbacks.isEmpty) {
+      body: NotificationListener<UserScrollNotification>(
+        onNotification: onFabScroll,
+        child: BlocBuilder<FeedbackBloc, FeedbackState>(
+          builder: (context, state) {
+            if (state is FeedbackError) {
               return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.feedback_outlined,
-                      size: 64,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(height: TashilSpacing.lg),
-                    Text(AppLocalizations.of(context)!.noFeedbackYet,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: TashilSpacing.sm),
-                    Text(AppLocalizations.of(context)!.sendFirstFeedback,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+                child: EmptyState(
+                  key: const Key('feedback_error'),
+                  icon: Symbols.error_outline_rounded,
+                  title: state.message,
+                  action: FilledButton.tonalIcon(
+                    onPressed: _load,
+                    icon: const Icon(Symbols.refresh_rounded),
+                    label: Text(l10n.retry),
+                  ),
                 ),
               );
             }
-
-            return RefreshIndicator(
-              onRefresh: () async {
-                context.read<FeedbackBloc>().add(
-                  LoadUserFeedbacksEvent(userId: widget.delegate.uid),
-                );
-              },
-              child: ListView.builder(
+            if (state is! FeedbacksLoaded) {
+              return ListView(
+                key: const Key('feedback_skeleton'),
                 padding: const EdgeInsets.all(TashilSpacing.page),
-                itemCount: state.feedbacks.length,
-                itemBuilder: (context, index) {
-                  final feedback = state.feedbacks[index];
-                  return _FeedbackCard(feedback: feedback, isArabic: isArabic);
-                },
+                children: const [
+                  SummaryCardSkeleton(),
+                  SummaryCardSkeleton(),
+                  SummaryCardSkeleton(),
+                ],
+              );
+            }
+
+            final all = [...state.feedbacks]
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            final open = all.where((f) => !_isClosed(f.status)).length;
+            final answered = all
+                .where((f) => (f.adminResponse ?? '').trim().isNotEmpty)
+                .length;
+            final shown = all.where((f) {
+              return switch (_filter) {
+                _Filter.open => !_isClosed(f.status),
+                _Filter.answered => (f.adminResponse ?? '').trim().isNotEmpty,
+                _Filter.all => true,
+              };
+            }).toList();
+
+            return PullToRefresh(
+              onRefresh: _refresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  TashilSpacing.page,
+                  TashilSpacing.sm,
+                  TashilSpacing.page,
+                  TashilSpacing.xxl * 2,
+                ),
+                children: [
+                  if (all.isNotEmpty) ...[
+                    ButtonGroup<_Filter>(
+                      key: const Key('feedback_filter'),
+                      variant: ButtonGroupVariant.connected,
+                      expand: true,
+                      selected: {_filter},
+                      onSelectionChanged: (v) =>
+                          setState(() => _filter = v.first),
+                      items: [
+                        ButtonGroupItem(
+                          value: _Filter.all,
+                          label: '${l10n.all} ${Bidi.ltr('${all.length}')}',
+                        ),
+                        ButtonGroupItem(
+                          value: _Filter.open,
+                          label: '${l10n.feedbackOpen} ${Bidi.ltr('$open')}',
+                        ),
+                        ButtonGroupItem(
+                          value: _Filter.answered,
+                          label:
+                              '${l10n.feedbackAnswered} ${Bidi.ltr('$answered')}',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: TashilSpacing.md),
+                  ],
+                  if (shown.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: TashilSpacing.xxl),
+                      child: EmptyState(
+                        key: const Key('feedback_empty'),
+                        icon: Symbols.rate_review_rounded,
+                        title: l10n.noFeedbackYet,
+                        message: l10n.sendFirstFeedback,
+                        action: all.isEmpty
+                            ? FilledButton.tonalIcon(
+                                onPressed: _newFeedback,
+                                icon: const Icon(Symbols.add_comment_rounded),
+                                label: Text(l10n.sendFeedback),
+                              )
+                            : null,
+                      ),
+                    )
+                  else
+                    for (final f in shown) _FeedbackCard(feedback: f),
+                ],
               ),
             );
-          }
-
-          return const SizedBox.shrink();
-        },
+          },
+        ),
       ),
     );
   }
 }
 
+IconData _typeIcon(FeedbackType type) => switch (type) {
+  FeedbackType.featureRequest => Symbols.lightbulb_rounded,
+  FeedbackType.bugReport => Symbols.bug_report_rounded,
+  FeedbackType.generalQuestion => Symbols.help_rounded,
+  FeedbackType.improvement => Symbols.auto_awesome_rounded,
+  FeedbackType.other => Symbols.chat_rounded,
+};
+
+/// Status as a label: resolved = success, pending = warning, rejected =
+/// error, the rest neutral (TAS-358 F-04).
+(Color, Color) _statusColors(BuildContext context, FeedbackStatus status) {
+  final cs = Theme.of(context).colorScheme;
+  final sem = Theme.of(context).extension<TashilSemanticColors>();
+  return switch (status) {
+    FeedbackStatus.resolved => (
+      sem?.successContainer ?? cs.primaryContainer,
+      sem?.onSuccessContainer ?? cs.onPrimaryContainer,
+    ),
+    FeedbackStatus.pending => (
+      sem?.warningContainer ?? cs.tertiaryContainer,
+      sem?.onWarningContainer ?? cs.onTertiaryContainer,
+    ),
+    FeedbackStatus.rejected => (cs.errorContainer, cs.onErrorContainer),
+    FeedbackStatus.reviewed || FeedbackStatus.inProgress => (
+      cs.secondaryContainer,
+      cs.onSecondaryContainer,
+    ),
+  };
+}
+
 class _FeedbackCard extends StatelessWidget {
+  const _FeedbackCard({required this.feedback});
   final FeedbackEntity feedback;
-  final bool isArabic;
-
-  const _FeedbackCard({required this.feedback, required this.isArabic});
-
-  /// TAS-358 (F-04): status as a compact label with a container role and
-  /// its on colour. Resolved = success, pending = warning, rejected = error,
-  /// the rest neutral (was hand-picked orange/blue/purple/green/red).
-  (Color, Color) _statusColors(BuildContext context, FeedbackStatus status) {
-    final cs = Theme.of(context).colorScheme;
-    final sem = Theme.of(context).extension<TashilSemanticColors>();
-    return switch (status) {
-      FeedbackStatus.resolved => (
-        sem?.successContainer ?? cs.primaryContainer,
-        sem?.onSuccessContainer ?? cs.onPrimaryContainer,
-      ),
-      FeedbackStatus.pending => (
-        sem?.warningContainer ?? cs.tertiaryContainer,
-        sem?.onWarningContainer ?? cs.onTertiaryContainer,
-      ),
-      FeedbackStatus.rejected => (cs.errorContainer, cs.onErrorContainer),
-      FeedbackStatus.reviewed ||
-      FeedbackStatus.inProgress => (
-        cs.secondaryContainer,
-        cs.onSecondaryContainer,
-      ),
-    };
-  }
-
-  IconData _getTypeIcon(FeedbackType type) {
-    switch (type) {
-      case FeedbackType.featureRequest:
-        return Icons.lightbulb_outline;
-      case FeedbackType.bugReport:
-        return Icons.bug_report_outlined;
-      case FeedbackType.generalQuestion:
-        return Icons.help_outline;
-      case FeedbackType.improvement:
-        return Icons.star_outline;
-      case FeedbackType.other:
-        return Icons.chat_bubble_outline;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dateFormat = DateFormat('dd/MM/yyyy - HH:mm');
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final locale = Localizations.localeOf(context).languageCode;
+    final isArabic = locale == 'ar';
+    final (bg, fg) = _statusColors(context, feedback.status);
+    final answered = (feedback.adminResponse ?? '').trim().isNotEmpty;
 
-    final (statusBg, statusFg) = _statusColors(context, feedback.status);
-    final cs = theme.colorScheme;
+    Widget summary(VoidCallback? onTap) => SummaryCard(
+      key: ValueKey('feedback_card_${feedback.id}'),
+      margin: EdgeInsets.zero,
+      onTap: onTap,
+      icon: _typeIcon(feedback.type),
+      title: feedback.type.getLabel(isArabic),
+      subtitle: feedback.content,
+      labels: [
+        SummaryLabel(
+          key: ValueKey('feedback_status_${feedback.status.name}'),
+          feedback.status.getLabel(isArabic),
+          container: bg,
+          onContainer: fg,
+        ),
+      ],
+      facts: [
+        SummaryFact(
+          icon: Symbols.schedule_rounded,
+          label: l10n.feedbackSentAt,
+          value: DateFormat(
+            'd MMMM • h:mm a',
+            locale,
+          ).format(feedback.createdAt),
+        ),
+        SummaryFact(
+          icon: answered
+              ? Symbols.mark_chat_read_rounded
+              : Symbols.hourglass_top_rounded,
+          label: l10n.adminResponse,
+          value: answered ? l10n.feedbackHasAnswer : l10n.feedbackNoAnswer,
+        ),
+      ],
+    );
 
-    return Card.filled(
-      margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.md),
-      child: Padding(
-        padding: const EdgeInsets.all(TashilSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header: النوع والحالة
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(TashilSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: cs.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _getTypeIcon(feedback.type),
-                    color: cs.onPrimary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: TashilSpacing.md),
-                Expanded(
-                  child: Text(
-                    feedback.type.getLabel(isArabic),
-                    style: theme.textTheme.titleSmall,
-                  ),
-                ),
-                Container(
-                  key: ValueKey('feedback_status_${feedback.status.name}'),
-                  padding: const EdgeInsetsDirectional.symmetric(
-                    horizontal: TashilSpacing.sm,
-                    vertical: TashilSpacing.xs / 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusBg,
-                    borderRadius: BorderRadius.circular(TashilRadius.small),
-                  ),
-                  child: Text(
-                    feedback.status.getLabel(isArabic),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: statusFg,
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
+      child: OpenContainer<void>(
+        closedElevation: 0,
+        openElevation: 0,
+        closedColor: cs.surfaceContainerHighest,
+        openColor: cs.surface,
+        middleColor: cs.surface,
+        closedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TashilRadius.medium),
+        ),
+        transitionDuration: MediaQuery.maybeDisableAnimationsOf(context) == true
+            ? Duration.zero
+            : const Duration(milliseconds: 400),
+        closedBuilder: (context, open) => summary(open),
+        openBuilder: (context, _) =>
+            _FeedbackDetails(feedback: feedback, summary: summary(null)),
+      ),
+    );
+  }
+}
+
+/// One feedback in full: the summary, the whole text, the screenshot and
+/// the admin's answer.
+class _FeedbackDetails extends StatelessWidget {
+  const _FeedbackDetails({required this.feedback, required this.summary});
+  final FeedbackEntity feedback;
+  final Widget summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final answer = (feedback.adminResponse ?? '').trim();
+
+    Widget title(IconData icon, String text) => Padding(
+      padding: const EdgeInsetsDirectional.only(
+        top: TashilSpacing.xl,
+        bottom: TashilSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: cs.primary),
+          const SizedBox(width: TashilSpacing.sm),
+          Text(text, style: tt.titleSmall),
+        ],
+      ),
+    );
+
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.myFeedback)),
+      body: ListView(
+        key: const Key('feedback_details'),
+        padding: const EdgeInsets.all(TashilSpacing.page),
+        children: [
+          summary,
+          title(Symbols.notes_rounded, l10n.feedbackYourMessage),
+          Text(feedback.content, style: tt.bodyLarge),
+          if (feedback.screenshotUrl != null) ...[
+            title(Symbols.image_rounded, l10n.feedbackScreenshot),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(TashilRadius.large),
+              child: AspectRatio(
+                aspectRatio: 3 / 4,
+                child: ColoredBox(
+                  color: cs.surfaceContainerHighest,
+                  child: InteractiveViewer(
+                    maxScale: 4,
+                    child: AppPhotoImage(
+                      photoUrl: feedback.screenshotUrl!,
+                      fit: BoxFit.contain,
                     ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: TashilSpacing.md),
-
-            // المحتوى
-            Text(
-              feedback.content,
-              style: theme.textTheme.bodyMedium,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: TashilSpacing.md),
-
-            // الصورة إذا كانت موجودة
-            if (feedback.screenshotUrl != null) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(TashilRadius.medium),
-                child: AppPhotoImage(
-                  photoUrl: feedback.screenshotUrl!,
-                  height: 120,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorWidget: Container(
-                    height: 120,
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: const Icon(Icons.broken_image),
                   ),
                 ),
               ),
-              const SizedBox(height: TashilSpacing.md),
-            ],
-
-            // رد الإدارة إذا كان موجوداً
-            if (feedback.adminResponse != null) ...[
-              Container(
-                padding: const EdgeInsets.all(TashilSpacing.md),
-                decoration: BoxDecoration(
-                  color: cs.surface,
-                  borderRadius: BorderRadius.circular(TashilRadius.medium),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.admin_panel_settings,
-                          size: 16,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: TashilSpacing.xs),
-                        Text(AppLocalizations.of(context)!.adminResponse,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: TashilSpacing.xs),
-                    Text(
-                      feedback.adminResponse!,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: TashilSpacing.md),
-            ],
-
-            // التاريخ
-            Row(
-              children: [
-                Icon(
-                  Icons.access_time,
-                  size: 14,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: TashilSpacing.xs),
-                Text(
-                  dateFormat.format(feedback.createdAt),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
             ),
           ],
-        ),
+          title(Symbols.support_agent_rounded, l10n.adminResponse),
+          if (answer.isNotEmpty)
+            Card.outlined(
+              key: const Key('feedback_answer'),
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(TashilSpacing.lg),
+                child: Text(answer, style: tt.bodyLarge),
+              ),
+            )
+          else
+            Text(
+              l10n.feedbackNoAnswerYet,
+              key: const Key('feedback_no_answer'),
+              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+        ],
       ),
     );
   }

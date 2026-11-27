@@ -1,39 +1,52 @@
-import 'package:delegate_app/core/design/widgets/dialogs.dart';
-import 'package:delegate_app/core/design/widgets/button_group.dart';
+import 'dart:async';
+
+import 'package:animations/animations.dart';
 import 'package:delegate_app/core/design/tokens.dart';
-import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
-import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
-import 'package:material_symbols_icons/symbols.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:delegate_app/features/photo_permission/presentation/photo_reports_refresh.dart';
+import 'package:delegate_app/core/design/widgets/button_group.dart';
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
+import 'package:delegate_app/core/design/widgets/empty_state.dart';
+import 'package:delegate_app/core/design/widgets/pull_to_refresh.dart';
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart' hide TextDirection;
-import 'package:delegate_app/config/theme/app_motion.dart';
-import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:delegate_app/core/services/photo_cache_manager.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
-import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/core/widgets/app_photo_image.dart';
+import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
+import 'package:delegate_app/features/photo_permission/presentation/photo_reports_refresh.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import '../widgets/sync_status_banner.dart';
-import '../widgets/company_name_with_code.dart';
-import '../bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart' hide TextDirection;
+import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
+
 import '../../domain/entities/captured_photo.dart';
+import '../bloc/photo_permission_bloc.dart';
+import '../widgets/sync_status_banner.dart';
+import 'photo_details_page.dart';
 
-enum GroupMode {
-  byDate,
-  byBranch,
-  byDelegate,
-}
+enum GroupMode { byDate, byBranch, byDelegate }
 
+/// Monthly photo report (delegate «تقارير الصور» tab, supervisors, HR web).
+///
+/// TAS-387 (user review 27 Nov 2026), built from the playground only:
+/// * one month card like attendance: arrows, the month (a menu of the months
+///   that have photos), «الشهر الحالي», the numbers, the archive note;
+/// * grouping is a connected ButtonGroup (C-06);
+/// * each group is a section header and a 3-column grid of the photos; a
+///   photo opens its page with a container transform;
+/// * only a photo still on the phone carries a badge;
+/// * skeletons while loading, PullToRefresh, EmptyState for empty and error.
 class MonthlyPhotoReportScreen extends StatelessWidget {
   final Delegate delegate;
   final bool showAppBar;
 
   /// Opt-in refresh button above the report, for hosts that hide the app
-  /// bar and its refresh action (the HR web shell inner page). Off by
-  /// default, so other callers are unchanged.
+  /// bar and its refresh action (the HR web shell inner page, where pull to
+  /// refresh does not work with a mouse). Off by default.
   final bool showInlineRefresh;
 
   const MonthlyPhotoReportScreen({
@@ -83,13 +96,14 @@ class _MonthlyPhotoReportContent extends StatefulWidget {
   });
 
   @override
-  State<_MonthlyPhotoReportContent> createState() => _MonthlyPhotoReportContentState();
+  State<_MonthlyPhotoReportContent> createState() =>
+      _MonthlyPhotoReportContentState();
 }
 
-class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> {
+class _MonthlyPhotoReportContentState
+    extends State<_MonthlyPhotoReportContent> {
   late DateTime _selectedMonth;
   GroupMode _currentGroupMode = GroupMode.byDate;
-  int _slideDirection = 0; // -1 for previous (left to right), +1 for next (right to left)
   List<CapturedPhoto> _cachedPhotos = const [];
   bool _hasLoadedPhotos = false;
   bool _reloadQueued = false;
@@ -106,13 +120,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
   void initState() {
     super.initState();
     _selectedMonth = _now;
-
-    final isGeneralManagerOrAdmin = _isManagerView;
-
-    if (isGeneralManagerOrAdmin) {
-      _currentGroupMode = GroupMode.byBranch;
-    }
-
+    if (_isManagerView) _currentGroupMode = GroupMode.byBranch;
     _loadPhotos();
     PhotoReportsRefresh.tick.addListener(_onReportsRefreshRequested);
   }
@@ -130,10 +138,9 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
   }
 
   /// Supervisors, admins, HR and marketing see the whole company's photos
-  /// (TAS-354: one list, was repeated in initState and _loadPhotos). The
-  /// field delegate sees only their own, so the «active delegates» count and
-  /// the «by delegate» grouping are hidden for them [UI only: the data is
-  /// already their own photos].
+  /// (TAS-354). The field delegate sees only their own, so the «active
+  /// delegates» count and the «by delegate» grouping are hidden for them
+  /// [UI only: the data is already their own photos].
   bool get _isManagerView =>
       widget.delegate.role == UserRole.admin ||
       widget.delegate.position == DelegatePosition.supervisor ||
@@ -151,437 +158,159 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
   }
 
   void _loadPhotos() {
-    final isGeneralManagerOrAdmin = _isManagerView;
-
-    if (isGeneralManagerOrAdmin) {
+    if (_isManagerView) {
       context.read<PhotoPermissionBloc>().add(
-            LoadCompanyCapturedPhotosRequested(
-              companyUID: widget.delegate.companyUID,
-              organizationUID: photoListOrgScope(
-                widget.delegate.role,
-                widget.delegate.organizationUID,
-              ),
-              limit: widget.delegate.companyUID.isEmpty ? 200 : null,
-            ),
-          );
-    } else {
-      context.read<PhotoPermissionBloc>().add(
-            LoadDelegateCapturedPhotosRequested(delegateUID: widget.delegate.uid),
-          );
-    }
-  }
-
-  Future<void> _confirmDeletePhoto(CapturedPhoto photo) async {
-    final bloc = context.read<PhotoPermissionBloc>();
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDesktop = MediaQuery.sizeOf(context).width > 768;
-
-    Widget buildConfirmContent(BuildContext modalContext) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          isDesktop ? 20 : 12,
-          20,
-          24 + MediaQuery.viewInsetsOf(modalContext).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!isDesktop) ...[
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4.5,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            Row(
-              children: [
-                Icon(Symbols.warning_amber_rounded, color: colorScheme.error, size: 28),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    AppLocalizations.of(context)!.confirmDeletePhoto,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              AppLocalizations.of(context)!.deletePhotoFromConfirm(photo.delegateName, BranchDisplayCache.instance.displayName(photo.branchName)),
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: colorScheme.error,
-                borderRadius: BorderRadius.circular(TashilRadius.medium),
-                border: Border.all(color: colorScheme.error),
-              ),
-              child: Row(
-                children: [
-                  Icon(Symbols.info_rounded, size: 18, color: colorScheme.error),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      AppLocalizations.of(context)!.photoDeletePermanentNote,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.error),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => Navigator.pop(modalContext, false),
-                        child: Center(
-                          child: Text(
-                            'إلغاء',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: colorScheme.outlineVariant,
-                  ),
-                  Expanded(
-                    child: Material(
-                      color: colorScheme.error,
-                      child: InkWell(
-                        onTap: () => Navigator.pop(modalContext, true),
-                        child: Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Symbols.delete_forever_rounded, size: 18, color: colorScheme.error),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  AppLocalizations.of(context)!.deletePermanently,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.error),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (!mounted) return;
-    final bool? confirmed;
-    if (isDesktop) {
-      confirmed = await showTashilDialog<bool>(
-        context: context,
-        builder: (dialogContext) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TashilRadius.extraLarge)),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: buildConfirmContent(dialogContext),
+        LoadCompanyCapturedPhotosRequested(
+          companyUID: widget.delegate.companyUID,
+          organizationUID: photoListOrgScope(
+            widget.delegate.role,
+            widget.delegate.organizationUID,
           ),
+          limit: widget.delegate.companyUID.isEmpty ? 200 : null,
         ),
       );
     } else {
-      confirmed = await showM3ModalBottomSheet<bool>(
-        context: context,
-        isScrollControlled: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        builder: (sheetContext) => buildConfirmContent(sheetContext),
-      );
-    }
-
-    if (confirmed == true && mounted) {
-      bloc.add(
-        DeleteCapturedPhotoRequested(
-          photoId: photo.uid,
-          organizationUID: photo.organizationUID.isNotEmpty
-              ? photo.organizationUID
-              : widget.delegate.organizationUID,
-          companyUID: photo.companyUID.isNotEmpty
-              ? photo.companyUID
-              : widget.delegate.companyUID,
-          permissionId: photo.permissionId,
-          photoUrl: photo.photoUrl,
-        ),
+      context.read<PhotoPermissionBloc>().add(
+        LoadDelegateCapturedPhotosRequested(delegateUID: widget.delegate.uid),
       );
     }
   }
 
-  void _previousMonth() {
-    setState(() {
-      _slideDirection = -1;
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
-    });
+  /// Pull to refresh: reload and wait for the answer (at most 8 s).
+  Future<void> _refresh() async {
+    final bloc = context.read<PhotoPermissionBloc>();
+    final done = bloc.stream.firstWhere(
+      (s) => s is CapturedPhotosLoaded || s is PhotoPermissionError,
+    );
+    _loadPhotos();
+    try {
+      await done.timeout(const Duration(seconds: 8));
+    } catch (_) {}
   }
+
+  /// Delete through the kit dialog (text buttons, the confirm named after
+  /// its result). Returns true when the delete was sent.
+  Future<bool> _confirmDeletePhoto(
+    BuildContext from,
+    CapturedPhoto photo,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final bloc = context.read<PhotoPermissionBloc>();
+    final confirmed = await showTashilDialog<bool>(
+      context: from,
+      builder: (c) => AlertDialog(
+        key: const Key('photo_delete_dialog'),
+        icon: const Icon(Symbols.delete_forever_rounded),
+        title: Text(l10n.confirmDeletePhoto),
+        content: Text(
+          '${l10n.deletePhotoFromConfirm(photo.delegateName, BranchDisplayCache.instance.displayName(photo.branchName))}\n\n'
+          '${l10n.photoDeletePermanentNote}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            key: const Key('photo_delete_confirm'),
+            onPressed: () => Navigator.pop(c, true),
+            child: Text(l10n.deletePermanently),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return false;
+    bloc.add(
+      DeleteCapturedPhotoRequested(
+        photoId: photo.uid,
+        organizationUID: photo.organizationUID.isNotEmpty
+            ? photo.organizationUID
+            : widget.delegate.organizationUID,
+        companyUID: photo.companyUID.isNotEmpty
+            ? photo.companyUID
+            : widget.delegate.companyUID,
+        permissionId: photo.permissionId,
+        photoUrl: photo.photoUrl,
+      ),
+    );
+    return true;
+  }
+
+  bool get _isCurrentMonth {
+    final now = _now;
+    return _selectedMonth.year == now.year && _selectedMonth.month == now.month;
+  }
+
+  void _selectMonth(DateTime month) =>
+      setState(() => _selectedMonth = DateTime(month.year, month.month));
+
+  void _previousMonth() =>
+      _selectMonth(DateTime(_selectedMonth.year, _selectedMonth.month - 1));
 
   void _nextMonth() {
-    final now = _now;
-    if (_selectedMonth.year >= now.year && _selectedMonth.month >= now.month) {
-      return;
-    }
-    setState(() {
-      _slideDirection = 1;
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
-    });
+    if (_isCurrentMonth) return;
+    _selectMonth(DateTime(_selectedMonth.year, _selectedMonth.month + 1));
   }
 
-  void _selectMonth(DateTime month) {
-    setState(() {
-      _slideDirection = month.isAfter(_selectedMonth) ? 1 : -1;
-      _selectedMonth = DateTime(month.year, month.month);
-    });
-  }
-
-  void _resetToCurrentMonth() {
-    final now = _now;
-    setState(() {
-      _slideDirection = 1;
-      _selectedMonth = DateTime(now.year, now.month);
-    });
-  }
-
-  void _showMonthPickerSheet(BuildContext context, List<CapturedPhoto> allPhotos) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final now = _now;
-
-    // Aggregate all historical months from allPhotos
-    final Map<String, int> monthCounts = {};
-    for (var photo in allPhotos) {
-      final key = '${photo.capturedAt.year}-${photo.capturedAt.month.toString().padLeft(2, '0')}';
-      monthCounts[key] = (monthCounts[key] ?? 0) + 1;
-    }
-
-    // Ensure current month is represented
-    final currentKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    monthCounts.putIfAbsent(currentKey, () => 0);
-
-    final sortedKeys = monthCounts.keys.toList()..sort((a, b) => b.compareTo(a));
-
-    showModalBottomSheet(
-      context: context,
-      sheetAnimationStyle: m3SheetAnimation,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Symbols.calendar_month_rounded, color: colorScheme.primary, size: 22),
-                      const SizedBox(width: 8),
-                      Text(
-                        AppLocalizations.of(context)!.chooseMonth,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Symbols.close_rounded, size: 20),
-                    onPressed: () => Navigator.pop(sheetContext),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: sortedKeys.length,
-                  itemBuilder: (context, index) {
-                    final key = sortedKeys[index];
-                    final parts = key.split('-');
-                    final year = int.parse(parts[0]);
-                    final month = int.parse(parts[1]);
-                    final date = DateTime(year, month);
-                    final isSelected = _selectedMonth.year == year && _selectedMonth.month == month;
-                    final isCurrent = now.year == year && now.month == month;
-                    final count = monthCounts[key] ?? 0;
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Material(
-                        color: isSelected
-                            ? colorScheme.primaryContainer
-                            : colorScheme.surfaceContainer,
-                        clipBehavior: Clip.antiAlias,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(TashilRadius.medium),
-                          side: BorderSide(
-                            color: isSelected
-                                ? colorScheme.primary
-                                : colorScheme.outlineVariant,
-                          ),
-                        ),
-                        child: ListTile(
-                        onTap: () {
-                          Navigator.pop(sheetContext);
-                          _selectMonth(date);
-                        },
-                        leading: Icon(
-                          isSelected ? Symbols.check_circle_rounded : Symbols.folder_rounded,
-                          color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                        ),
-                        title: Text(
-                          _getMonthNameArabic(date),
-                          style: TextStyle(
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                            color: isSelected ? colorScheme.primary : colorScheme.onSurface,
-                          ),
-                        ),
-                        subtitle: isCurrent
-                            ? Text(
-                                AppLocalizations.of(context)!.currentMonth,
-                                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.secondary, fontWeight: FontWeight.bold),
-                              )
-                            : null,
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: count > 0
-                                ? colorScheme.primary
-                                : colorScheme.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(TashilRadius.small),
-                          ),
-                          child: Text(
-                            AppLocalizations.of(context)!.photosCount(count),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: count > 0 ? colorScheme.primary : colorScheme.onSurfaceVariant),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  String _monthName(DateTime date) => DateFormat.yMMMM(
+    Localizations.localeOf(context).languageCode,
+  ).format(date);
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final now = _now;
-    final isCurrentMonth = _selectedMonth.year == now.year && _selectedMonth.month == now.month;
-
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: widget.showAppBar
           ? AppBar(
-              title: Text(
-                AppLocalizations.of(context)!.photoReportsTitle,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              centerTitle: true,
-              elevation: 0,
-              scrolledUnderElevation: 1,
+              title: Text(l10n.photoReportsTitle),
               actions: [
                 IconButton(
                   icon: const Icon(Symbols.refresh_rounded),
-                  tooltip: AppLocalizations.of(context)!.refreshPhotos,
+                  tooltip: l10n.refreshPhotos,
                   onPressed: _loadPhotos,
                 ),
               ],
             )
           : null,
-      backgroundColor: colorScheme.surfaceContainerLowest,
-      body: _withInlineRefresh(BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
-        listener: (context, state) {
-          if (state is CapturedPhotosLoaded) {
-            setState(() {
-              _cachedPhotos = state.photos;
-              _hasLoadedPhotos = true;
-              _reloadQueued = false;
-            });
-          } else if (state is PhotoBatchUploadSuccess) {
-            _loadPhotos();
-          } else if (state is PhotoPermissionActionSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: colorScheme.primary,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-            _loadPhotos();
-          } else if (state is PhotoPermissionError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: colorScheme.error,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          if (state is PhotoPermissionLoading && !_hasLoadedPhotos) {
-            return const Center(child: M3DelayedLoading());
-          }
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+      body: _withInlineRefresh(
+        BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
+          listener: (context, state) {
+            if (state is CapturedPhotosLoaded) {
+              setState(() {
+                _cachedPhotos = state.photos;
+                _hasLoadedPhotos = true;
+                _reloadQueued = false;
+              });
+            } else if (state is PhotoBatchUploadSuccess) {
+              _loadPhotos();
+            } else if (state is PhotoPermissionActionSuccess) {
+              showTashilSnackBar(context, state.message);
+              _loadPhotos();
+            } else if (state is PhotoPermissionError) {
+              if (_hasLoadedPhotos) showTashilSnackBar(context, state.message);
+            }
+          },
+          builder: (context, state) {
+            if (state is PhotoPermissionError && !_hasLoadedPhotos) {
+              return Center(
+                child: EmptyState(
+                  key: const Key('photo_report_error'),
+                  icon: Symbols.error_outline_rounded,
+                  title: l10n.photoReportsLoadFailed,
+                  message: state.message,
+                  action: FilledButton.tonalIcon(
+                    onPressed: _loadPhotos,
+                    icon: const Icon(Symbols.refresh_rounded),
+                    label: Text(l10n.retry),
+                  ),
+                ),
+              );
+            }
 
-          if (state is CapturedPhotosLoaded || _hasLoadedPhotos) {
-            // After a successful upload the shared bloc often moves to
-            // OngoingPermissionsLoaded, which used to hide the list and
-            // leave the November count at 0 (M31 f7dbcf37). Keep the last
-            // loaded photos and refresh on upload success.
+            // After an upload the shared bloc may move to
+            // OngoingPermissionsLoaded; keep the last list and reload
+            // (M31 f7dbcf37).
             final allPhotos = state is CapturedPhotosLoaded
                 ? state.photos
                 : _cachedPhotos;
@@ -591,783 +320,263 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                 if (mounted) _loadPhotos();
               });
             }
+            final loading = !_hasLoadedPhotos && state is! CapturedPhotosLoaded;
+            return _buildReport(allPhotos, loading: loading);
+          },
+        ),
+      ),
+    );
+  }
 
-            // Filter photos for the selected month
-            final filteredPhotos = allPhotos.where((photo) {
-              return photo.capturedAt.year == _selectedMonth.year &&
-                  photo.capturedAt.month == _selectedMonth.month;
-            }).toList();
+  Widget _buildReport(List<CapturedPhoto> allPhotos, {required bool loading}) {
+    final l10n = AppLocalizations.of(context)!;
+    final photos = allPhotos
+        .where(
+          (p) =>
+              p.capturedAt.year == _selectedMonth.year &&
+              p.capturedAt.month == _selectedMonth.month,
+        )
+        .toList();
+    if (photos.isNotEmpty) {
+      PhotoCacheManager.precachePhotos(photos.map((p) => p.photoUrl));
+    }
 
-            // Pre-cache all photos in the background into local persistent disk cache
-            if (filteredPhotos.isNotEmpty) {
-              PhotoCacheManager.precachePhotos(filteredPhotos.map((p) => p.photoUrl));
-            }
-
-            // Statistics calculation
-            final totalPhotos = filteredPhotos.length;
-            final uniqueBranches = filteredPhotos.map((p) => p.branchId).toSet().length;
-            final uniqueDelegates = filteredPhotos.map((p) => p.delegateUID.isNotEmpty ? p.delegateUID : p.delegateName).toSet().length;
-
-            // Extract historical months that have photos
-            final Map<String, int> availableMonthsMap = {};
-            for (var p in allPhotos) {
-              final k = '${p.capturedAt.year}-${p.capturedAt.month.toString().padLeft(2, '0')}';
-              availableMonthsMap[k] = (availableMonthsMap[k] ?? 0) + 1;
-            }
-            final sortedAvailableKeys = availableMonthsMap.keys.toList()..sort((a, b) => b.compareTo(a));
-
-            return M3Refresh(
-              onRefresh: () async {
-                _loadPhotos();
-              },
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  // Sync Status Banner
-                  const SliverToBoxAdapter(
-                    child: SyncStatusBanner(),
-                  ),
-
-                  // Company Identity Header
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainer,
-                          borderRadius: BorderRadius.circular(TashilRadius.large),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                borderRadius: BorderRadius.circular(TashilRadius.medium),
-                              ),
-                              child: Icon(
-                                Symbols.business_rounded,
-                                color: colorScheme.onPrimary,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  CompanyNameWithCode(
-                                    organizationUID: widget.delegate.organizationUID,
-                                    companyUID: widget.delegate.companyUID,
-                                    companyName: widget.delegate.companyName,
-                                    companyCode: null,
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    AppLocalizations.of(context)!.photosArchiveNote,
-                                    style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Animated Month Navigator Bar
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainer,
-                          borderRadius: BorderRadius.circular(TashilRadius.large),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Previous Month Button (Unlimited historical cycling)
-                            IconButton.filledTonal(
-                              style: IconButton.styleFrom(
-                                backgroundColor: colorScheme.surface,
-                                foregroundColor: colorScheme.primary,
-                                padding: const EdgeInsets.all(8),
-                                minimumSize: const Size(48, 48),
-                              ),
-                              icon: Icon(
-                                Directionality.of(context) == TextDirection.rtl ? Symbols.chevron_right_rounded : Symbols.chevron_left_rounded,
-                                size: 22,
-                                textDirection: TextDirection.ltr,
-                              ),
-                              onPressed: _previousMonth,
-                              tooltip: AppLocalizations.of(context)!.previousMonth,
-                            ),
-
-                            // Animated Month Title + Picker trigger
-                            InkWell(
-                              onTap: () => _showMonthPickerSheet(context, allPhotos),
-                              borderRadius: BorderRadius.circular(TashilRadius.medium),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    AnimatedSwitcher(
-                                      duration: AppMotionDurations.medium2,
-                                      transitionBuilder: (child, animation) {
-                                        final offsetAnimation = Tween<Offset>(
-                                          begin: Offset(_slideDirection * 0.4, 0.0),
-                                          end: Offset.zero,
-                                        ).animate(CurvedAnimation(
-                                          parent: animation,
-                                          curve: AppMotionCurves.emphasizedDecelerate,
-                                        ));
-                                        return FadeTransition(
-                                          opacity: animation,
-                                          child: SlideTransition(
-                                            position: offsetAnimation,
-                                            child: child,
-                                          ),
-                                        );
-                                      },
-                                      child: KeyedSubtree(
-                                        key: ValueKey('${_selectedMonth.year}-${_selectedMonth.month}'),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              _getMonthNameArabic(_selectedMonth),
-                                              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Icon(
-                                              Symbols.arrow_drop_down_rounded,
-                                              color: colorScheme.primary,
-                                              size: 20,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    if (!isCurrentMonth) ...[
-                                      const SizedBox(height: 2),
-                                      InkWell(
-                                        onTap: _resetToCurrentMonth,
-                                        borderRadius: BorderRadius.circular(TashilRadius.small),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Symbols.restore_rounded,
-                                                size: 13,
-                                                color: colorScheme.secondary,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                AppLocalizations.of(context)!.currentMonth,
-                                                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.secondary),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Next Month Button
-                            IconButton.filledTonal(
-                              style: IconButton.styleFrom(
-                                backgroundColor: colorScheme.surface,
-                                foregroundColor: isCurrentMonth ? colorScheme.outline : colorScheme.primary,
-                                padding: const EdgeInsets.all(8),
-                                minimumSize: const Size(48, 48),
-                              ),
-                              icon: Icon(
-                                Directionality.of(context) == TextDirection.rtl ? Symbols.chevron_left_rounded : Symbols.chevron_right_rounded,
-                                size: 22,
-                                textDirection: TextDirection.ltr,
-                              ),
-                              onPressed: isCurrentMonth ? null : _nextMonth,
-                              tooltip: AppLocalizations.of(context)!.nextMonth,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // TAS-354 (C-11): months with photos as single-select
-                  // FilterChips «month · count» in one scrolling row.
-                  if (sortedAvailableKeys.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsetsDirectional.symmetric(
-                          horizontal: TashilSpacing.page,
-                          vertical: TashilSpacing.xs,
-                        ),
-                        child: Row(
-                          children: [
-                            for (final k in sortedAvailableKeys) ...[
-                              Builder(
-                                builder: (context) {
-                                  final parts = k.split('-');
-                                  final y = int.parse(parts[0]);
-                                  final m = int.parse(parts[1]);
-                                  final chipDate = DateTime(y, m);
-                                  return Padding(
-                                    padding: const EdgeInsetsDirectional.only(
-                                      end: TashilSpacing.sm,
-                                    ),
-                                    child: FilterChip(
-                                      key: ValueKey('photo_month_$k'),
-                                      selected: _selectedMonth.year == y &&
-                                          _selectedMonth.month == m,
-                                      label: Text(
-                                        '${_getMonthNameArabic(chipDate)} · ${availableMonthsMap[k] ?? 0}',
-                                      ),
-                                      onSelected: (_) => _selectMonth(chipDate),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // Summary Metrics Cards (Photos, Branches, Delegates)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: AppLocalizations.of(context)!.totalPhotos,
-                              value: '$totalPhotos',
-                              icon: Symbols.photo_library_rounded,
-                              theme: theme,
-                            ),
+    return PullToRefresh(
+      onRefresh: _refresh,
+      child: CustomScrollView(
+        key: const Key('photo_report_scroll'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          const SliverToBoxAdapter(child: SyncStatusBanner()),
+          SliverPadding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              TashilSpacing.page,
+              TashilSpacing.md,
+              TashilSpacing.page,
+              TashilSpacing.sm,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: _buildMonthCard(allPhotos, photos, loading: loading),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              TashilSpacing.page,
+              TashilSpacing.xs,
+              TashilSpacing.page,
+              TashilSpacing.sm,
+            ),
+            sliver: SliverToBoxAdapter(child: _buildGroupButtons()),
+          ),
+          if (loading)
+            _photoGridSkeleton()
+          else if (photos.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: EmptyState(
+                  key: const Key('photo_report_empty'),
+                  icon: Symbols.photo_library_rounded,
+                  title: l10n.noPhotosInMonth(_monthName(_selectedMonth)),
+                  message: l10n.useArrowsForMonths,
+                  action: _isManagerView
+                      ? null
+                      : FilledButton.tonalIcon(
+                          key: const Key('photo_report_capture'),
+                          onPressed: () => context.push(
+                            '/photo-permissions/delegate',
+                            extra: widget.delegate,
                           ),
-                          const SizedBox(width: TashilSpacing.sm),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: AppLocalizations.of(context)!.branchesVisited,
-                              value: '$uniqueBranches',
-                              icon: Symbols.storefront_rounded,
-                              theme: theme,
-                            ),
-                          ),
-                          if (_isManagerView) ...[
-                            const SizedBox(width: TashilSpacing.sm),
-                            Expanded(
-                              child: _buildMetricCard(
-                                title: AppLocalizations.of(context)!
-                                    .activeDelegates,
-                                value: '$uniqueDelegates',
-                                icon: Symbols.group_rounded,
-                                theme: theme,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // TAS-354 (C-06): grouping is a connected ButtonGroup
-                  // (2-3 exclusive options). «By delegate» only for the
-                  // manager view.
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.fromSTEB(
-                        TashilSpacing.page,
-                        TashilSpacing.xs,
-                        TashilSpacing.page,
-                        TashilSpacing.sm,
-                      ),
-                      child: ButtonGroup<GroupMode>(
-                        key: const Key('photo_group_mode'),
-                        variant: ButtonGroupVariant.connected,
-                        expand: true,
-                        selected: {
-                          !_isManagerView &&
-                                  _currentGroupMode == GroupMode.byDelegate
-                              ? GroupMode.byDate
-                              : _currentGroupMode,
-                        },
-                        onSelectionChanged: (v) =>
-                            setState(() => _currentGroupMode = v.first),
-                        items: [
-                          ButtonGroupItem(
-                            value: GroupMode.byDate,
-                            label: AppLocalizations.of(context)!.byDate,
-                            icon: Symbols.calendar_month_rounded,
-                          ),
-                          ButtonGroupItem(
-                            value: GroupMode.byBranch,
-                            label: AppLocalizations.of(context)!.byBranch,
-                            icon: Symbols.store_rounded,
-                          ),
-                          if (_isManagerView)
-                            ButtonGroupItem(
-                              value: GroupMode.byDelegate,
-                              label: AppLocalizations.of(context)!.byDelegate,
-                              icon: Symbols.person_rounded,
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Photos list or Empty state with smooth animated transition
-                  if (filteredPhotos.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _buildEmptyState(theme, colorScheme),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      sliver: _buildGroupedPhotosList(filteredPhotos, theme),
-                    ),
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 24),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (state is PhotoPermissionError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Symbols.error_outline_rounded, size: 56, color: colorScheme.error),
-                    const SizedBox(height: 16),
-                    Text(
-                      AppLocalizations.of(context)!.photoReportsLoadFailed,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      state.message,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton.tonalIcon(
-                      onPressed: _loadPhotos,
-                      icon: const Icon(Symbols.refresh_rounded, size: 18),
-                      label: Text(AppLocalizations.of(context)!.retry),
-                    ),
-                  ],
+                          icon: const Icon(Symbols.photo_camera_rounded),
+                          label: Text(l10n.photosCaptureAction),
+                        ),
                 ),
               ),
-            );
-          }
-
-          return const Center(child: M3DelayedLoading());
-        },
-      )),
-    );
-  }
-
-  /// Adds the opt-in refresh button above [body]; it runs the same reload
-  /// as the app bar action.
-  Widget _withInlineRefresh(Widget body) {
-    if (!widget.showInlineRefresh) return body;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 8, 0),
-          child: Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: IconButton(
-              key: const ValueKey('monthly_report_inline_refresh'),
-              icon: const Icon(Symbols.refresh_rounded),
-              tooltip: 'تحديث',
-              onPressed: _loadPhotos,
-            ),
-          ),
-        ),
-        Expanded(child: body),
-      ],
-    );
-  }
-
-  Widget _buildMetricCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required ThemeData theme,
-  }) {
-    final colorScheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(TashilRadius.large),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: colorScheme.primary,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: colorScheme.onPrimary, size: 16),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+            )
+          else
+            ..._buildGroups(photos),
+          const SliverToBoxAdapter(child: SizedBox(height: TashilSpacing.xxl)),
         ],
       ),
     );
   }
 
-  Widget _buildGroupedPhotosList(List<CapturedPhoto> photos, ThemeData theme) {
-    if (_currentGroupMode == GroupMode.byDate) {
-      final Map<String, List<CapturedPhoto>> grouped = {};
-      for (var photo in photos) {
-        final dateKey = DateFormat('yyyy-MM-dd').format(photo.capturedAt);
-        grouped.putIfAbsent(dateKey, () => []).add(photo);
-      }
-
-      final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
-
-      return SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final key = sortedKeys[index];
-            final groupPhotos = grouped[key]!;
-            final displayDate = DateFormat.yMMMMEEEEd(Localizations.localeOf(context).languageCode).format(DateTime.parse(key));
-
-            return _buildGroupSection(
-              title: displayDate,
-              icon: Symbols.calendar_today_rounded,
-              photos: groupPhotos,
-              theme: theme,
-            );
-          },
-          childCount: sortedKeys.length,
-        ),
-      );
-    } else if (_currentGroupMode == GroupMode.byBranch) {
-      final Map<String, List<CapturedPhoto>> grouped = {};
-      for (var photo in photos) {
-        grouped.putIfAbsent(photo.branchName, () => []).add(photo);
-      }
-
-      final sortedKeys = grouped.keys.toList()..sort();
-
-      return SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final key = sortedKeys[index];
-            final groupPhotos = grouped[key]!;
-
-            return _buildGroupSection(
-              title: key,
-              icon: Symbols.storefront_rounded,
-              photos: groupPhotos,
-              theme: theme,
-            );
-          },
-          childCount: sortedKeys.length,
-        ),
-      );
-    } else {
-      // GroupMode.byDelegate
-      final Map<String, List<CapturedPhoto>> grouped = {};
-      for (var photo in photos) {
-        final delName = photo.delegateName.trim().isNotEmpty ? photo.delegateName.trim() : AppLocalizations.of(context)!.unknownDelegate;
-        grouped.putIfAbsent(delName, () => []).add(photo);
-      }
-
-      final sortedKeys = grouped.keys.toList()..sort();
-
-      return SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final key = sortedKeys[index];
-            final groupPhotos = grouped[key]!;
-
-            return _buildGroupSection(
-              title: key,
-              icon: Symbols.person_rounded,
-              photos: groupPhotos,
-              theme: theme,
-            );
-          },
-          childCount: sortedKeys.length,
-        ),
-      );
-    }
-  }
-
-  Widget _buildGroupSection({
-    required String title,
-    required IconData icon,
-    required List<CapturedPhoto> photos,
-    required ThemeData theme,
+  /// The month card (same layout as the attendance month card): arrows, the
+  /// month (opens a menu of months with photos), «الشهر الحالي», the
+  /// numbers and the archive note.
+  Widget _buildMonthCard(
+    List<CapturedPhoto> allPhotos,
+    List<CapturedPhoto> photos, {
+    required bool loading,
   }) {
-    final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(TashilRadius.large),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          collapsedBackgroundColor: colorScheme.surfaceContainer,
-          backgroundColor: colorScheme.surfaceContainerLowest,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          leading: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: colorScheme.primary,
-              borderRadius: BorderRadius.circular(TashilRadius.medium),
-            ),
-            child: Icon(icon, color: colorScheme.onPrimary, size: 18),
-          ),
-          title: Text(
-            title,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(TashilRadius.small),
-                ),
-                child: Text(
-                  AppLocalizations.of(context)!.photosCount(photos.length),
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant),
+    final monthCounts = <DateTime, int>{};
+    for (final p in allPhotos) {
+      final k = DateTime(p.capturedAt.year, p.capturedAt.month);
+      monthCounts[k] = (monthCounts[k] ?? 0) + 1;
+    }
+    monthCounts.putIfAbsent(DateTime(_now.year, _now.month), () => 0);
+    final months = monthCounts.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    Widget stat(IconData icon, int value, String label) => Expanded(
+      child: Container(
+        padding: const EdgeInsetsDirectional.symmetric(
+          vertical: TashilSpacing.md,
+          horizontal: TashilSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(TashilRadius.medium),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 24, color: cs.onSurfaceVariant),
+            const SizedBox(height: TashilSpacing.xs),
+            SkeletonSwitcher(
+              loading: loading,
+              skeleton: const Padding(
+                padding: EdgeInsets.symmetric(vertical: TashilSpacing.xs),
+                child: Skeleton(width: 40, height: 24),
+              ),
+              child: Text(
+                '$value',
+                style: tt.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface,
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(Symbols.expand_more_rounded, size: 20),
-            ],
-          ),
-          children: photos.map((photo) => _buildCompactPhotoCard(context, photo, theme)).toList(),
+            ),
+            Text(
+              label,
+              style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
-  }
 
-  Widget _buildCompactPhotoCard(BuildContext context, CapturedPhoto photo, ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    final dateStr = DateFormat('yyyy-MM-dd • hh:mm a', Localizations.localeOf(context).languageCode).format(photo.capturedAt);
-    final isPending = photo.uid.startsWith('pending_');
+    final branches = photos.map((p) => p.branchId).toSet().length;
+    final delegates = photos
+        .map((p) => p.delegateUID.isNotEmpty ? p.delegateUID : p.delegateName)
+        .toSet()
+        .length;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(TashilRadius.medium),
-        border: Border.all(
-          color: isPending
-              ? Theme.of(context).colorScheme.tertiary
-              : colorScheme.outlineVariant,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showPhotoDetails(context, photo),
-          borderRadius: BorderRadius.circular(TashilRadius.medium),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
+    return Card.filled(
+      key: const Key('photo_month_card'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(TashilSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                // Thumbnail 54x54
-                AppPhotoImage(
-                  photoUrl: photo.photoUrl,
-                  width: 54,
-                  height: 54,
-                  isThumbnail: true,
-                  borderRadius: BorderRadius.circular(TashilRadius.medium),
-                  fit: BoxFit.cover,
+                // Symbols chevrons mirror in RTL by themselves.
+                IconButton.filledTonal(
+                  key: const Key('photo_month_previous'),
+                  icon: const Icon(Symbols.chevron_left_rounded),
+                  tooltip: l10n.previousMonth,
+                  onPressed: _previousMonth,
                 ),
-                const SizedBox(width: 12),
-
-                // Info
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _currentGroupMode == GroupMode.byDelegate
-                                  ? BranchDisplayCache.instance.displayName(photo.branchName)
-                                  : photo.delegateName.isNotEmpty
-                                      ? photo.delegateName
-                                      : BranchDisplayCache.instance.displayName(photo.branchName),
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                      MenuAnchor(
+                        builder: (context, controller, _) => TextButton.icon(
+                          key: const Key('photo_month_menu'),
+                          onPressed: () => controller.isOpen
+                              ? controller.close()
+                              : controller.open(),
+                          icon: const Icon(Symbols.arrow_drop_down_rounded),
+                          iconAlignment: IconAlignment.end,
+                          label: Text(
+                            _monthName(_selectedMonth),
+                            style: tt.titleMedium?.copyWith(color: cs.primary),
                           ),
-                          if (_currentGroupMode == GroupMode.byDelegate) ...[
-                            Text(
-                              photo.delegateName,
-                              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.primary, fontWeight: FontWeight.bold),
+                        ),
+                        menuChildren: [
+                          for (final m in months)
+                            MenuItemButton(
+                              key: ValueKey(
+                                'photo_month_${m.year}-${m.month.toString().padLeft(2, '0')}',
+                              ),
+                              leadingIcon: Icon(
+                                m.year == _selectedMonth.year &&
+                                        m.month == _selectedMonth.month
+                                    ? Symbols.check_rounded
+                                    : Symbols.calendar_month_rounded,
+                              ),
+                              trailingIcon: Text(
+                                '${monthCounts[m] ?? 0}',
+                                style: tt.labelLarge?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                              onPressed: () => _selectMonth(m),
+                              child: Text(_monthName(m)),
                             ),
-                          ],
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _currentGroupMode == GroupMode.byDate
-                            ? '${BranchDisplayCache.instance.displayName(photo.branchName)} • $dateStr'
-                            : dateStr,
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          if (isPending) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.tertiaryContainer,
-                                borderRadius: BorderRadius.circular(TashilRadius.small),
-                                border: Border.all(color: Theme.of(context).colorScheme.tertiary, width: 0.8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Symbols.cloud_off_rounded, size: 10, color: Theme.of(context).colorScheme.onTertiaryContainer),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    AppLocalizations.of(context)!.pendingOnPhone,
-                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onTertiaryContainer),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ] else ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(TashilRadius.small),
-                                border: Border.all(color: Theme.of(context).colorScheme.primary, width: 0.8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Symbols.cloud_done_rounded, size: 10, color: Theme.of(context).colorScheme.onPrimaryContainer),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    AppLocalizations.of(context)!.uploadedToServer,
-                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onPrimaryContainer),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          if (photo.comment.trim().isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            Icon(Symbols.comment_rounded, size: 12, color: colorScheme.onSurfaceVariant),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                photo.comment.trim(),
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                      if (!_isCurrentMonth)
+                        TextButton.icon(
+                          key: const Key('photo_month_current'),
+                          onPressed: () => _selectMonth(_now),
+                          icon: const Icon(Symbols.restore_rounded),
+                          label: Text(l10n.currentMonth),
+                        ),
                     ],
                   ),
                 ),
-
-                // Trailing action
-                Icon(
-                  Symbols.chevron_right_rounded,
-                  color: colorScheme.onSurfaceVariant,
-                  size: 20,
+                IconButton.filledTonal(
+                  key: const Key('photo_month_next'),
+                  icon: const Icon(Symbols.chevron_right_rounded),
+                  tooltip: l10n.nextMonth,
+                  onPressed: _isCurrentMonth ? null : _nextMonth,
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(ThemeData theme, ColorScheme colorScheme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Symbols.photo_library_rounded,
-                size: 56,
-                color: colorScheme.onSurfaceVariant,
-              ),
+            const SizedBox(height: TashilSpacing.md),
+            Row(
+              children: [
+                stat(
+                  Symbols.photo_library_rounded,
+                  photos.length,
+                  l10n.totalPhotos,
+                ),
+                const SizedBox(width: TashilSpacing.sm),
+                stat(
+                  Symbols.storefront_rounded,
+                  branches,
+                  l10n.branchesVisited,
+                ),
+                if (_isManagerView) ...[
+                  const SizedBox(width: TashilSpacing.sm),
+                  stat(Symbols.group_rounded, delegates, l10n.activeDelegates),
+                ],
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              AppLocalizations.of(context)!.noPhotosInMonth(_getMonthNameArabic(_selectedMonth)),
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              AppLocalizations.of(context)!.useArrowsForMonths,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
+            const SizedBox(height: TashilSpacing.sm),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Symbols.info_rounded,
+                  size: 16,
+                  color: cs.onSurfaceVariant,
+                ),
+                const SizedBox(width: TashilSpacing.xs),
+                Expanded(
+                  child: Text(
+                    l10n.photosArchiveNote,
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1375,330 +584,257 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     );
   }
 
-  String _getMonthNameArabic(DateTime date) {
-    final formatter = DateFormat.yMMMM(Localizations.localeOf(context).languageCode);
-    return formatter.format(date);
-  }
-
-  void _showPhotoDetails(BuildContext context, CapturedPhoto photo) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final formattedDate = DateFormat.yMMMMEEEEd(Localizations.localeOf(context).languageCode).add_jm().format(photo.capturedAt);
-
-    showModalBottomSheet(
-      context: context,
-      sheetAnimationStyle: m3SheetAnimation,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalContext) {
-        bool isSaving = false;
-        bool saveSuccess = false;
-        String? statusText;
-
-        return StatefulBuilder(
-          builder: (sheetContext, setSheetState) {
-            return DraggableScrollableSheet(
-              initialChildSize: 0.85,
-              minChildSize: 0.5,
-              maxChildSize: 0.95,
-              builder: (scrollContext, scrollController) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Pull Handle
-                      Center(
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 12),
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: colorScheme.outlineVariant,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-
-                      // Header title
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              AppLocalizations.of(context)!.photoDetails,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_canDeletePhoto)
-                                  IconButton(
-                                    tooltip: AppLocalizations.of(context)!.deletePhotoPermanently,
-                                    icon: Icon(Symbols.delete_outline_rounded, size: 22, color: Theme.of(context).colorScheme.error),
-                                    onPressed: () {
-                                      Navigator.pop(modalContext);
-                                      _confirmDeletePhoto(photo);
-                                    },
-                                  ),
-                                IconButton(
-                                  icon: const Icon(Symbols.close_rounded, size: 20),
-                                  onPressed: () => Navigator.pop(modalContext),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-
-                      Expanded(
-                        child: ListView(
-                          controller: scrollController,
-                          padding: const EdgeInsets.all(16),
-                          children: [
-                            // Interactive image with zoom
-                            Container(
-                              height: 340,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(TashilRadius.large),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: InteractiveViewer(
-                                panEnabled: true,
-                                minScale: 1.0,
-                                maxScale: 4.0,
-                                child: AppPhotoImage(
-                                  photoUrl: photo.photoUrl,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Center(
-                              child: Text(
-                                AppLocalizations.of(context)!.pinchToZoom,
-                                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Action Buttons (Save + Delete if permitted)
-                            Row(
-                              children: [
-                                if (_canDeletePhoto) ...[
-                                  OutlinedButton.icon(
-                                    onPressed: () {
-                                      Navigator.pop(modalContext);
-                                      _confirmDeletePhoto(photo);
-                                    },
-                                    icon: Icon(Symbols.delete_rounded, color: colorScheme.error, size: 18),
-                                    label: Text(
-                                      AppLocalizations.of(context)!.deletePhoto,
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.error, fontWeight: FontWeight.bold),
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(color: colorScheme.error),
-                                      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TashilRadius.medium)),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                                Expanded(
-                                  child: FilledButton.icon(
-                                    onPressed: isSaving
-                                        ? null
-                                        : () async {
-                                            setSheetState(() {
-                                              isSaving = true;
-                                              statusText = null;
-                                            });
-                                            try {
-                                              final success = await PhotoCacheManager.savePhotoToGallery(
-                                                context,
-                                                photoUrl: photo.photoUrl,
-                                              );
-                                              if (sheetContext.mounted) {
-                                                setSheetState(() {
-                                                  isSaving = false;
-                                                  saveSuccess = success;
-                                                  statusText = success
-                                                      ? AppLocalizations.of(context)!.photoSavedToGallery
-                                                      : AppLocalizations.of(context)!.grantPhotosPermission;
-                                                });
-                                              }
-                                            } catch (e) {
-                                              if (sheetContext.mounted) {
-                                                setSheetState(() {
-                                                  isSaving = false;
-                                                  saveSuccess = false;
-                                                  statusText = AppLocalizations.of(context)!.photoSaveFailed(e);
-                                                });
-                                              }
-                                            }
-                                          },
-                                    icon: isSaving
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : Icon(
-                                            saveSuccess ? Symbols.check_circle_rounded : Symbols.download_rounded,
-                                            size: 18,
-                                          ),
-                                    label: Text(
-                                      isSaving
-                                          ? AppLocalizations.of(context)!.savingPhoto
-                                          : saveSuccess
-                                              ? AppLocalizations.of(context)!.savedToPhone
-                                              : AppLocalizations.of(context)!.savePhoto,
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                    ),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: saveSuccess ? colorScheme.primary : null,
-                                      padding: const EdgeInsets.symmetric(vertical: 13),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TashilRadius.medium)),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            // In-Modal Status Notification Banner
-                            if (statusText != null) ...[
-                              const SizedBox(height: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: saveSuccess ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.tertiaryContainer,
-                                  borderRadius: BorderRadius.circular(TashilRadius.medium),
-                                  border: Border.all(
-                                    color: saveSuccess ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.tertiary,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      saveSuccess ? Symbols.check_circle_rounded : Symbols.info_rounded,
-                                      color: saveSuccess ? Theme.of(context).colorScheme.onPrimaryContainer : Theme.of(context).colorScheme.onTertiaryContainer,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        statusText!,
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: saveSuccess ? Theme.of(context).colorScheme.onPrimaryContainer : Theme.of(context).colorScheme.onTertiaryContainer),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 16),
-
-                            // Report details card
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(TashilRadius.large),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildDetailItem(
-                                    icon: Symbols.business_rounded,
-                                    title: AppLocalizations.of(context)!.companyLabel,
-                                    value: photo.companyName.isNotEmpty
-                                        ? photo.companyName
-                                        : widget.delegate.companyName,
-                                    theme: theme,
-                                  ),
-                                  const Divider(height: 18),
-                                  _buildDetailItem(
-                                    icon: Symbols.storefront_rounded,
-                                    title: AppLocalizations.of(context)!.branchField,
-                                    value: photo.branchName,
-                                    theme: theme,
-                                  ),
-                                  const Divider(height: 18),
-                                  _buildDetailItem(
-                                    icon: Symbols.calendar_today_rounded,
-                                    title: AppLocalizations.of(context)!.capturedAtField,
-                                    value: formattedDate,
-                                    theme: theme,
-                                  ),
-                                  const Divider(height: 18),
-                                  _buildDetailItem(
-                                    icon: Symbols.person_rounded,
-                                    title: AppLocalizations.of(context)!.delegateField,
-                                    value: photo.delegateName,
-                                    theme: theme,
-                                  ),
-                                  if (photo.comment.trim().isNotEmpty) ...[
-                                    const Divider(height: 18),
-                                    _buildDetailItem(
-                                      icon: Symbols.comment_rounded,
-                                      title: AppLocalizations.of(context)!.delegateCommentField,
-                                      value: photo.comment,
-                                      theme: theme,
-                                      isComment: true,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
+  /// TAS-354 (C-06): grouping is a connected ButtonGroup. «By delegate»
+  /// only for the manager view.
+  Widget _buildGroupButtons() {
+    final l10n = AppLocalizations.of(context)!;
+    return ButtonGroup<GroupMode>(
+      key: const Key('photo_group_mode'),
+      variant: ButtonGroupVariant.connected,
+      expand: true,
+      selected: {
+        !_isManagerView && _currentGroupMode == GroupMode.byDelegate
+            ? GroupMode.byDate
+            : _currentGroupMode,
       },
+      onSelectionChanged: (v) => setState(() => _currentGroupMode = v.first),
+      items: [
+        ButtonGroupItem(
+          value: GroupMode.byDate,
+          label: l10n.byDate,
+          icon: Symbols.calendar_month_rounded,
+        ),
+        ButtonGroupItem(
+          value: GroupMode.byBranch,
+          label: l10n.byBranch,
+          icon: Symbols.store_rounded,
+        ),
+        if (_isManagerView)
+          ButtonGroupItem(
+            value: GroupMode.byDelegate,
+            label: l10n.byDelegate,
+            icon: Symbols.person_rounded,
+          ),
+      ],
     );
   }
 
-  Widget _buildDetailItem({
+  /// Each group: a section header (title + count) and a 3-column grid.
+  List<Widget> _buildGroups(List<CapturedPhoto> photos) {
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context).languageCode;
+    final grouped = <String, List<CapturedPhoto>>{};
+    final IconData icon;
+    switch (_currentGroupMode) {
+      case GroupMode.byDate:
+        icon = Symbols.calendar_today_rounded;
+        for (final p in photos) {
+          grouped
+              .putIfAbsent(
+                DateFormat('yyyy-MM-dd').format(p.capturedAt),
+                () => [],
+              )
+              .add(p);
+        }
+      case GroupMode.byBranch:
+        icon = Symbols.storefront_rounded;
+        for (final p in photos) {
+          grouped
+              .putIfAbsent(
+                BranchDisplayCache.instance.displayName(p.branchName),
+                () => [],
+              )
+              .add(p);
+        }
+      case GroupMode.byDelegate:
+        icon = Symbols.person_rounded;
+        for (final p in photos) {
+          final name = p.delegateName.trim().isNotEmpty
+              ? p.delegateName.trim()
+              : l10n.unknownDelegate;
+          grouped.putIfAbsent(name, () => []).add(p);
+        }
+    }
+    final keys = grouped.keys.toList()
+      ..sort(
+        (a, b) => _currentGroupMode == GroupMode.byDate
+            ? b.compareTo(a)
+            : a.compareTo(b),
+      );
+
+    // Grid order, so the details page swipes in the same order.
+    final ordered = [for (final k in keys) ...grouped[k]!];
+    return [
+      for (final k in keys) ...[
+        SliverPadding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+            TashilSpacing.page,
+            TashilSpacing.lg,
+            TashilSpacing.page,
+            TashilSpacing.sm,
+          ),
+          sliver: SliverToBoxAdapter(
+            child: _sectionHeader(
+              icon: icon,
+              title: _currentGroupMode == GroupMode.byDate
+                  ? DateFormat('EEEE، d MMMM', locale).format(DateTime.parse(k))
+                  : k,
+              count: grouped[k]!.length,
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: TashilSpacing.page,
+          ),
+          sliver: SliverGrid.count(
+            crossAxisCount: 3,
+            mainAxisSpacing: TashilSpacing.sm,
+            crossAxisSpacing: TashilSpacing.sm,
+            children: [for (final p in grouped[k]!) _photoTile(p, ordered)],
+          ),
+        ),
+      ],
+    ];
+  }
+
+  Widget _sectionHeader({
     required IconData icon,
     required String title,
-    required String value,
-    required ThemeData theme,
-    bool isComment = false,
+    required int count,
   }) {
-    final colorScheme = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Row(
-      crossAxisAlignment: isComment ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
-        Icon(icon, color: colorScheme.primary, size: 18),
-        const SizedBox(width: 10),
+        Icon(icon, size: 20, color: cs.primary),
+        const SizedBox(width: TashilSpacing.sm),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Text(
+            title,
+            style: tt.titleSmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Text(
+          AppLocalizations.of(context)!.photosCount(count),
+          style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
+
+  /// One photo in the grid. A photo still on the phone carries a small
+  /// badge; uploaded ones carry nothing. Opens with a container transform.
+  Widget _photoTile(CapturedPhoto photo, List<CapturedPhoto> ordered) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final pending = photo.uid.startsWith('pending_');
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(TashilRadius.medium),
+    );
+    return OpenContainer<bool>(
+      key: ValueKey('photo_tile_${photo.uid}'),
+      closedElevation: 0,
+      openElevation: 0,
+      closedShape: shape,
+      closedColor: cs.surfaceContainerHighest,
+      openColor: cs.surface,
+      middleColor: cs.surface,
+      transitionDuration: MediaQuery.maybeDisableAnimationsOf(context) == true
+          ? Duration.zero
+          : const Duration(milliseconds: 400),
+      closedBuilder: (context, open) => Semantics(
+        button: true,
+        label:
+            '${BranchDisplayCache.instance.displayName(photo.branchName)} ${DateFormat('h:mm a', Localizations.localeOf(context).languageCode).format(photo.capturedAt)}',
+        child: InkWell(
+          onTap: open,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+              AppPhotoImage(
+                photoUrl: photo.photoUrl,
+                isThumbnail: true,
+                fit: BoxFit.cover,
               ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontStyle: isComment ? FontStyle.italic : FontStyle.normal),
-              ),
+              if (pending)
+                PositionedDirectional(
+                  top: TashilSpacing.xs,
+                  end: TashilSpacing.xs,
+                  child: Tooltip(
+                    message: l10n.pendingOnPhone,
+                    child: Container(
+                      key: Key('photo_pending_${photo.uid}'),
+                      padding: const EdgeInsets.all(TashilSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: cs.tertiaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Symbols.cloud_off_rounded,
+                        size: 16,
+                        color: cs.onTertiaryContainer,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
+      ),
+      openBuilder: (context, close) => PhotoDetailsPage(
+        photos: ordered,
+        initialIndex: ordered.indexOf(photo),
+        companyFallback: widget.delegate.companyName,
+        onDelete: _canDeletePhoto ? _confirmDeletePhoto : null,
+      ),
+    );
+  }
+
+  Widget _photoGridSkeleton() => SliverPadding(
+    key: const Key('photo_report_skeleton'),
+    padding: const EdgeInsetsDirectional.fromSTEB(
+      TashilSpacing.page,
+      TashilSpacing.lg,
+      TashilSpacing.page,
+      0,
+    ),
+    sliver: SliverGrid.count(
+      crossAxisCount: 3,
+      mainAxisSpacing: TashilSpacing.sm,
+      crossAxisSpacing: TashilSpacing.sm,
+      children: [
+        for (var i = 0; i < 9; i++)
+          const Skeleton(radius: TashilRadius.medium, height: double.infinity),
+      ],
+    ),
+  );
+
+  /// Adds the opt-in refresh button above [body] (HR web shell).
+  Widget _withInlineRefresh(Widget body) {
+    if (!widget.showInlineRefresh) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.only(
+            start: TashilSpacing.page,
+            end: TashilSpacing.sm,
+            top: TashilSpacing.xs,
+          ),
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: IconButton(
+              key: const ValueKey('monthly_report_inline_refresh'),
+              icon: const Icon(Symbols.refresh_rounded),
+              tooltip: AppLocalizations.of(context)!.refreshAction,
+              onPressed: _loadPhotos,
+            ),
+          ),
+        ),
+        Expanded(child: body),
       ],
     );
   }

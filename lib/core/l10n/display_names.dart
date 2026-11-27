@@ -100,5 +100,11 @@ String firstNameForLocale(
 }) {
   final n = nameForLocale(fullName, '', isArabic: isArabic);
   if (n.isEmpty) return fallback;
-  return n.split(' ').first;
+  final parts = n.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  // Compound Arabic first names: «عبد الرحمن», «أبو بكر», not «عبد».
+  const prefixes = {'عبد', 'عبدال', 'أبو', 'ابو', 'أبي'};
+  if (parts.length > 1 && prefixes.contains(parts.first)) {
+    return '${parts[0]} ${parts[1]}';
+  }
+  return parts.first;
 }

@@ -88,6 +88,23 @@ class _MainScreenState extends State<MainScreen> {
       _initializedTabs.add(tab);
     }
     _loadAllDelegates();
+    _watchPendingRequests();
+  }
+
+  StreamSubscription<int>? _pendingSub;
+  int _pendingRequests = 0;
+
+  /// Badge on «طلباتي»: requests still waiting for an answer (user review
+  /// 27 Nov 2026). No Firebase (widget tests) means no badge.
+  void _watchPendingRequests() {
+    _pendingSub?.cancel();
+    try {
+      _pendingSub = pendingRequestsCount(widget.delegate).listen((n) {
+        if (mounted) setState(() => _pendingRequests = n);
+      }, onError: (_) {});
+    } catch (_) {
+      _pendingSub = null;
+    }
   }
 
   @override
@@ -105,11 +122,13 @@ class _MainScreenState extends State<MainScreen> {
         if (keep != null) _initializedTabs.add(keep);
       });
       _loadAllDelegates();
+      _watchPendingRequests();
     }
   }
 
   @override
   void dispose() {
+    _pendingSub?.cancel();
     _bar.dispose();
     super.dispose();
   }
@@ -268,16 +287,20 @@ class _MainScreenState extends State<MainScreen> {
                     ? state.unreadCount
                     : 0;
 
-                return Badge(
-                  label: Text('$unreadCount'),
-                  isLabelVisible: unreadCount > 0,
-                  child: IconButton(
-                    icon: const Icon(Symbols.notifications_rounded),
+                // M3: the badge sits on the icon, not on the 48dp button
+                // corner (it was far from the bell, and under the DEV ribbon).
+                return IconButton(
+                    key: const Key('header_notifications_button'),
+                    icon: Badge(
+                      key: const Key('header_notifications_badge'),
+                      label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+                      isLabelVisible: unreadCount > 0,
+                      child: const Icon(Symbols.notifications_rounded),
+                    ),
                     tooltip: l10n.notifications,
                     onPressed: () {
                       context.push('/notifications', extra: delegate);
                     },
-                  ),
                 );
               },
             ),
@@ -564,6 +587,7 @@ class _MainScreenState extends State<MainScreen> {
       icon: Icons.event_note_outlined,
       selectedIcon: Icons.event_note_rounded,
       label: l10n.navRequests,
+      badge: _pendingRequests > 0 ? _pendingRequests : null,
     ),
     TashilDestination(
       icon: Icons.photo_library_outlined,

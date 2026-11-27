@@ -18,11 +18,20 @@ import 'app_motion.dart';
 /// The seed stays the delegate app's purple by default; the person can pick
 /// another one in settings ([ThemeCubit]), and the roles follow it.
 class AppTheme {
-  static ThemeData lightTheme([Color? seedColor]) =>
-      _app(TashilTheme.light(seed: seedColor ?? TashilColors.seed));
+  /// [contrast]: the level picked in settings (TAS-387).
+  static ThemeData lightTheme([
+    Color? seedColor,
+    TashilContrast contrast = TashilContrast.standard,
+  ]) => _app(
+    TashilTheme.light(seed: seedColor ?? TashilColors.seed, contrast: contrast),
+  );
 
-  static ThemeData darkTheme([Color? seedColor]) =>
-      _app(TashilTheme.dark(seed: seedColor ?? TashilColors.seed));
+  static ThemeData darkTheme([
+    Color? seedColor,
+    TashilContrast contrast = TashilContrast.standard,
+  ]) => _app(
+    TashilTheme.dark(seed: seedColor ?? TashilColors.seed, contrast: contrast),
+  );
 
   /// Used by `MaterialApp.highContrastTheme`, so the system "high contrast"
   /// setting switches every role to about 7:1 text contrast.

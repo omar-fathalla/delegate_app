@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/design/widgets/pull_to_refresh.dart';
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 // M3 Expressive building blocks for the delegate home and tabs (home_v2).
 // Spec: M3_Design_System.md §37–39 and tashil-loading-spec.md.
@@ -316,89 +318,27 @@ class _WavyPainter extends CustomPainter {
   bool shouldRepaint(_WavyPainter o) => o.phase != phase || o.value != value;
 }
 
-/// Pull-to-refresh: no circular spinner; a wavy bar pinned to the top while
-/// the refresh future runs (never shown together with a skeleton).
-class M3Refresh extends StatefulWidget {
+/// Pull to refresh: the kit [PullToRefresh] (playground «السحب للتحديث»,
+/// TAS-387): a contained loading indicator on top, no spinner.
+class M3Refresh extends StatelessWidget {
   const M3Refresh({super.key, required this.onRefresh, required this.child});
   final Future<void> Function() onRefresh;
   final Widget child;
   @override
-  State<M3Refresh> createState() => _M3RefreshState();
+  Widget build(BuildContext context) =>
+      PullToRefresh(onRefresh: onRefresh, child: child);
 }
 
-class _M3RefreshState extends State<M3Refresh> {
-  bool _busy = false;
-  Future<void> _run() async {
-    setState(() => _busy = true);
-    try {
-      await widget.onRefresh();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        RefreshIndicator.noSpinner(onRefresh: _run, child: widget.child),
-        PositionedDirectional(
-          top: 0,
-          start: 0,
-          end: 0,
-          child: AnimatedSwitcher(
-            duration: M3Motion.short4,
-            child: _busy
-                ? const Padding(
-                    key: ValueKey('wavy'),
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                    child: M3WavyLinearProgress())
-                : const SizedBox.shrink(),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Skeleton block (surfaceContainerHighest, gentle pulse; static if reduced).
-class M3Skeleton extends StatefulWidget {
+/// Skeleton block: the kit [Skeleton] (playground «هيكل التحميل», TAS-387).
+class M3Skeleton extends StatelessWidget {
   const M3Skeleton({super.key, this.height = 16, this.width, this.radius = 8});
   final double height;
   final double? width;
   final double radius;
   @override
-  State<M3Skeleton> createState() => _M3SkeletonState();
-}
-
-class _M3SkeletonState extends State<M3Skeleton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1000))
-    ..repeat(reverse: true);
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final box = Container(
-      height: widget.height,
-      width: widget.width,
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(widget.radius),
-      ),
-    );
-    if (M3Motion.reduced(context)) return box;
-    return FadeTransition(
-        opacity: Tween(begin: 0.55, end: 1.0)
-            .animate(CurvedAnimation(parent: _c, curve: M3Motion.standard)),
-        child: box);
-  }
+  Widget build(BuildContext context) => radius * 2 >= height && width == height
+      ? Skeleton.circle(size: height)
+      : Skeleton(width: width, height: height, radius: radius);
 }
 
 // ───────────────────────── Interaction ─────────────────────────

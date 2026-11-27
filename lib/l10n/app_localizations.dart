@@ -2696,6 +2696,468 @@ abstract class AppLocalizations {
   /// **'Current chain'**
   String get activeChain;
 
+  /// No description provided for @attChainLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Chain'**
+  String get attChainLabel;
+
+  /// No description provided for @attBranchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch'**
+  String get attBranchLabel;
+
+  /// No description provided for @attAllBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'All branches'**
+  String get attAllBranches;
+
+  /// No description provided for @attMonthProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Days attended of work days'**
+  String get attMonthProgressTitle;
+
+  /// No description provided for @attMonthProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Attended {count} of {total} work days'**
+  String attMonthProgress(int count, int total);
+
+  /// No description provided for @attDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get attDurationLabel;
+
+  /// No description provided for @attCheckInLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in'**
+  String get attCheckInLabel;
+
+  /// No description provided for @attCheckOutLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-out'**
+  String get attCheckOutLabel;
+
+  /// No description provided for @notifKindAttention.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs attention'**
+  String get notifKindAttention;
+
+  /// No description provided for @notifKindDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get notifKindDone;
+
+  /// No description provided for @notifKindChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get notifKindChange;
+
+  /// No description provided for @notifKindWork.
+  ///
+  /// In en, this message translates to:
+  /// **'To do'**
+  String get notifKindWork;
+
+  /// No description provided for @notifKindAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance'**
+  String get notifKindAttendance;
+
+  /// No description provided for @notifKindInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get notifKindInfo;
+
+  /// No description provided for @reqRejectReasonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for rejection'**
+  String get reqRejectReasonTitle;
+
+  /// No description provided for @reqDecidedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Decided by'**
+  String get reqDecidedBy;
+
+  /// No description provided for @reqHoursWord.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{hour} other{hours}}'**
+  String reqHoursWord(int count);
+
+  /// No description provided for @reqDaysWord.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{day} other{days}}'**
+  String reqDaysWord(int count);
+
+  /// No description provided for @reqDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get reqDurationLabel;
+
+  /// No description provided for @reqFilterPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get reqFilterPending;
+
+  /// No description provided for @photosCaptureAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph a display'**
+  String get photosCaptureAction;
+
+  /// No description provided for @photoLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the photo'**
+  String get photoLoadFailed;
+
+  /// No description provided for @photoPendingBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is still on the phone. It uploads when you are back online.'**
+  String get photoPendingBanner;
+
+  /// No description provided for @photoBannerOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get photoBannerOk;
+
+  /// No description provided for @photoShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get photoShare;
+
+  /// No description provided for @photoShareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t share the photo'**
+  String get photoShareFailed;
+
+  /// No description provided for @photoOpenMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Open on the map'**
+  String get photoOpenMap;
+
+  /// No description provided for @photoMapFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the map'**
+  String get photoMapFailed;
+
+  /// No description provided for @photoPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous photo'**
+  String get photoPrevious;
+
+  /// No description provided for @photoNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next photo'**
+  String get photoNext;
+
+  /// No description provided for @photoCounter.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} of {total}'**
+  String photoCounter(int index, int total);
+
+  /// No description provided for @photoSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo at {branch}, {time}'**
+  String photoSemantic(String branch, String time);
+
+  /// No description provided for @profileWorkInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Work details'**
+  String get profileWorkInfo;
+
+  /// No description provided for @profileDelegateCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate code'**
+  String get profileDelegateCode;
+
+  /// No description provided for @profileChains.
+  ///
+  /// In en, this message translates to:
+  /// **'Chains'**
+  String get profileChains;
+
+  /// No description provided for @profileCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get profileCopy;
+
+  /// No description provided for @profileCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied'**
+  String get profileCopied;
+
+  /// No description provided for @profileShowId.
+  ///
+  /// In en, this message translates to:
+  /// **'Show number'**
+  String get profileShowId;
+
+  /// No description provided for @profileHideId.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide number'**
+  String get profileHideId;
+
+  /// No description provided for @taskStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start task'**
+  String get taskStart;
+
+  /// No description provided for @taskFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as done'**
+  String get taskFinish;
+
+  /// No description provided for @taskOverdueLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get taskOverdueLabel;
+
+  /// No description provided for @taskOverdueBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{This task is 1 day overdue} other{This task is {count} days overdue}}'**
+  String taskOverdueBanner(int count);
+
+  /// No description provided for @taskDueInDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Tomorrow} other{In {count} days}}'**
+  String taskDueInDays(int count);
+
+  /// No description provided for @taskProofSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof of work'**
+  String get taskProofSection;
+
+  /// No description provided for @taskFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get taskFrom;
+
+  /// No description provided for @taskAssignedToLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'For'**
+  String get taskAssignedToLabel;
+
+  /// No description provided for @taskAssignedAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All delegates'**
+  String get taskAssignedAll;
+
+  /// No description provided for @taskSentAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get taskSentAt;
+
+  /// No description provided for @taskDoneAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get taskDoneAt;
+
+  /// No description provided for @tasksFilterOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get tasksFilterOpen;
+
+  /// No description provided for @tasksFilterDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get tasksFilterDone;
+
+  /// No description provided for @tasksGroupOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get tasksGroupOverdue;
+
+  /// No description provided for @tasksGroupOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming up'**
+  String get tasksGroupOpen;
+
+  /// No description provided for @tasksGroupDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get tasksGroupDone;
+
+  /// No description provided for @taskLateBy.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day late} other{{count} days late}}'**
+  String taskLateBy(int count);
+
+  /// No description provided for @captureStepPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Place'**
+  String get captureStepPlace;
+
+  /// No description provided for @captureStepPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get captureStepPhotos;
+
+  /// No description provided for @capturePermissionUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission valid until {date}'**
+  String capturePermissionUntil(String date);
+
+  /// No description provided for @captureTapToReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a photo to view it large, retake or remove it.'**
+  String get captureTapToReview;
+
+  /// No description provided for @settingsAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearance;
+
+  /// No description provided for @settingsAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get settingsAuto;
+
+  /// No description provided for @settingsContrast.
+  ///
+  /// In en, this message translates to:
+  /// **'Contrast'**
+  String get settingsContrast;
+
+  /// No description provided for @settingsContrastHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For text and borders. «High» reads better in sunlight.'**
+  String get settingsContrastHint;
+
+  /// No description provided for @settingsContrastStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get settingsContrastStandard;
+
+  /// No description provided for @settingsContrastMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get settingsContrastMedium;
+
+  /// No description provided for @settingsContrastHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get settingsContrastHigh;
+
+  /// No description provided for @settingsColorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Every app colour is generated from this one.'**
+  String get settingsColorHint;
+
+  /// No description provided for @settingsAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsAbout;
+
+  /// No description provided for @feedbackOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get feedbackOpen;
+
+  /// No description provided for @feedbackAnswered.
+  ///
+  /// In en, this message translates to:
+  /// **'Answered'**
+  String get feedbackAnswered;
+
+  /// No description provided for @feedbackSentAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get feedbackSentAt;
+
+  /// No description provided for @feedbackHasAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'Answered'**
+  String get feedbackHasAnswer;
+
+  /// No description provided for @feedbackNoAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'Not yet'**
+  String get feedbackNoAnswer;
+
+  /// No description provided for @feedbackYourMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your message'**
+  String get feedbackYourMessage;
+
+  /// No description provided for @feedbackScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Attached screenshot'**
+  String get feedbackScreenshot;
+
+  /// No description provided for @feedbackNoAnswerYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer yet. You will get a notification when the team replies.'**
+  String get feedbackNoAnswerYet;
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

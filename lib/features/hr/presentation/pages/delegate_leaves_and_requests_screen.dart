@@ -1,5 +1,8 @@
+import 'package:delegate_app/core/design/bidi.dart';
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+import 'package:delegate_app/core/design/widgets/summary_card.dart';
+import 'package:animations/animations.dart';
 import 'package:delegate_app/core/design/widgets/button_group.dart';
-import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/core/design/widgets/date_time_fields.dart';
 import 'package:delegate_app/core/design/widgets/dialogs.dart';
@@ -15,7 +18,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+import 'package:intl/intl.dart' hide Bidi, TextDirection;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/domain/services/leave_notification_target.dart';
 import 'package:delegate_app/features/hr/domain/services/payroll_day_rules.dart';
@@ -36,6 +39,15 @@ class DelegateLeavesAndRequestsScreen extends StatefulWidget {
       _DelegateLeavesAndRequestsScreenState();
 }
 
+/// Live count of the delegate's pending requests (the «طلباتي» tab badge).
+Stream<int> pendingRequestsCount(Delegate d) => FirebaseFirestore.instance
+    .collection('leave_requests')
+    .where('companyUID', isEqualTo: d.companyUID)
+    .where('delegateUid', isEqualTo: d.uid)
+    .where('status', isEqualTo: 'pending')
+    .snapshots()
+    .map((s) => s.size);
+
 class _DelegateLeavesAndRequestsScreenState
     extends State<DelegateLeavesAndRequestsScreen>
     with ExtendedFabScroll {
@@ -43,7 +55,7 @@ class _DelegateLeavesAndRequestsScreenState
   bool _isAnnualLeaveEnabled = false;
   int _annualLeaveQuota = 21; // الرصيد السنوي (21 يوم)
   int _currentRemainingBalance = 21;
-  final Set<String> _expandedDocIds = {};
+  bool _planExpanded = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _leaveSub;
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _leaveDocs = const [];
@@ -70,24 +82,36 @@ class _DelegateLeavesAndRequestsScreenState
         .doc(widget.delegate.uid)
         .snapshots()
         .listen((doc) {
-      if (doc.exists && mounted) {
-        final data = doc.data();
-        if (data != null) {
-          setState(() {
-            if (data.containsKey('isAnnualLeaveEnabled')) {
-              _isAnnualLeaveEnabled = data['isAnnualLeaveEnabled'] == true;
+          if (doc.exists && mounted) {
+            final data = doc.data();
+            if (data != null) {
+              setState(() {
+                if (data.containsKey('isAnnualLeaveEnabled')) {
+                  _isAnnualLeaveEnabled = data['isAnnualLeaveEnabled'] == true;
+                }
+                if (data['annualLeaveQuota'] is num) {
+                  _annualLeaveQuota = (data['annualLeaveQuota'] as num).toInt();
+                }
+              });
             }
-            if (data['annualLeaveQuota'] is num) {
-              _annualLeaveQuota = (data['annualLeaveQuota'] as num).toInt();
-            }
-          });
-        }
-      }
-    });
+          }
+        });
     FirestoreSessionSubscriptions.instance.register(_userSubKey, _userSub!);
   }
 
-  void _listenToLeaveRequests() {
+  /// Pull to refresh (C-29): re-listen and wait for the first snapshot.
+  Future<void> _refresh() async {
+    final done = Completer<void>();
+    _listenToLeaveRequests(
+      onFirst: () {
+        if (!done.isCompleted) done.complete();
+      },
+    );
+    _listenToDelegateStatus();
+    await done.future.timeout(const Duration(seconds: 8), onTimeout: () {});
+  }
+
+  void _listenToLeaveRequests({VoidCallback? onFirst}) {
     _leaveSub?.cancel();
     _leaveSub = FirebaseFirestore.instance
         .collection('leave_requests')
@@ -95,12 +119,14 @@ class _DelegateLeavesAndRequestsScreenState
         .where('delegateUid', isEqualTo: widget.delegate.uid)
         .snapshots()
         .listen((snap) {
-      if (!mounted) return;
-      setState(() {
-        _leaveDocs = snap.docs;
-        _leaveLoaded = true;
-      });
-    });
+          if (!mounted) return;
+          setState(() {
+            _leaveDocs = snap.docs;
+            _leaveLoaded = true;
+          });
+          onFirst?.call();
+          onFirst = null;
+        });
     FirestoreSessionSubscriptions.instance.register(_leaveSubKey, _leaveSub!);
   }
 
@@ -145,17 +171,6 @@ class _DelegateLeavesAndRequestsScreenState
                   ),
                 ],
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Symbols.refresh_rounded),
-                  tooltip: AppLocalizations.of(context)!.refreshAction,
-                  onPressed: () {
-                    _listenToLeaveRequests();
-                    _listenToDelegateStatus();
-                  },
-                ),
-                const SizedBox(width: 8),
-              ],
             )
           : null,
       // TAS-353 (C-04): shrinks to an icon while the list scrolls down.
@@ -169,169 +184,193 @@ class _DelegateLeavesAndRequestsScreenState
       body: NotificationListener<UserScrollNotification>(
         onNotification: onFabScroll,
         child: Builder(
-        builder: (context) {
-          if (!_leaveLoaded) {
-            return const Center(child: M3DelayedLoading());
-          }
-
-          final docs = _leaveDocs;
-          final allLeaves = docs.map((d) {
-            final data = d.data();
-            return {
-              'docId': d.id,
-              ...data,
-            };
-          }).toList();
-
-          // Dual-layer client-side security filtering (Zero leakage)
-          allLeaves.removeWhere(
-            (item) =>
-                (item['companyUID'] ?? '') != widget.delegate.companyUID ||
-                (item['delegateUid'] ?? '') != widget.delegate.uid,
-          );
-
-          // ترتيب زمني تنازلي من الأحدث للأقدم
-          allLeaves.sort((a, b) {
-            final aTime = a['createdAt'];
-            final bTime = b['createdAt'];
-            if (aTime is Timestamp && bTime is Timestamp) {
-              return bTime.compareTo(aTime);
+          builder: (context) {
+            if (!_leaveLoaded) {
+              return const Center(child: DelayedLoadingIndicator());
             }
-            return 0;
-          });
 
-          // حساب الإحصائيات
-          final pendingCount =
-              allLeaves.where((r) => r['status'] == 'pending').length;
-          final approvedCount =
-              allLeaves.where((r) => r['status'] == 'approved').length;
-          final rejectedCount =
-              allLeaves.where((r) => r['status'] == 'rejected').length;
+            final docs = _leaveDocs;
+            final allLeaves = docs.map((d) {
+              final data = d.data();
+              return {'docId': d.id, ...data};
+            }).toList();
 
-          // المقترح 5: احتساب رصيد الإجازات السنوي المستهلك والمتبقي للعام الحالي
-          final currentYear = DateTime.now().year;
-          // TAS-313: السنوية بس، بنفس تعريف مسير الرواتب.
-          final usedLeaveDaysThisYear =
-              PayrollDayRules.usedAnnualLeaveDaysInYear(allLeaves, currentYear);
-          final remainingBalance = (_annualLeaveQuota - usedLeaveDaysThisYear)
-              .clamp(0, _annualLeaveQuota);
-          _currentRemainingBalance = remainingBalance;
+            // Dual-layer client-side security filtering (Zero leakage)
+            allLeaves.removeWhere(
+              (item) =>
+                  (item['companyUID'] ?? '') != widget.delegate.companyUID ||
+                  (item['delegateUid'] ?? '') != widget.delegate.uid,
+            );
 
-          // فلترة القائمة حسب التبويب
-          final filteredLeaves = allLeaves.where((req) {
-            final status = (req['status'] ?? 'pending').toString();
-            if (_selectedStatusFilter != 'all' &&
-                status != _selectedStatusFilter) {
-              return false;
+            // Pending first (what still needs an answer), then the newest
+            // period first (user review 27 Nov 2026).
+            int rank(Map<String, dynamic> r) =>
+                r['status'] == 'pending' ? 0 : 1;
+            Timestamp? when(Map<String, dynamic> r) {
+              final v = r['startDate'] ?? r['createdAt'];
+              return v is Timestamp ? v : null;
             }
-            return true;
-          }).toList();
 
-          return CustomScrollView(
-            slivers: [
-              // ── 1. Leave Balance & KPI Summary Cards ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // كارت رصيد الإجازات السنوي أو كارت فترة التجربة (الإجازات الأسبوعية فقط)
-                      if (_isAnnualLeaveEnabled)
-                        _buildAnnualBalanceCard(
-                          usedDays: usedLeaveDaysThisYear,
-                          remainingDays: remainingBalance,
-                          totalQuota: _annualLeaveQuota,
-                          colorScheme: colorScheme,
-                        )
-                      else
-                        _buildProbationWeeklyLeavesCard(
-                          colorScheme: colorScheme,
-                          theme: theme,
-                          isArabic: isArabic,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+            allLeaves.sort((a, b) {
+              final byStatus = rank(a).compareTo(rank(b));
+              if (byStatus != 0) return byStatus;
+              final aTime = when(a);
+              final bTime = when(b);
+              if (aTime != null && bTime != null) return bTime.compareTo(aTime);
+              return 0;
+            });
 
-              // ── 2. Filter Button Group (مجموعة أزرار متصلة بدون سكرول) ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.symmetric(
-                    vertical: TashilSpacing.xs,
-                  ),
-                  child: _buildFilterButtonGroup(
-                    totalCount: allLeaves.length,
-                    pendingCount: pendingCount,
-                    approvedCount: approvedCount,
-                    rejectedCount: rejectedCount,
-                    colorScheme: colorScheme,
-                  ),
-                ),
-              ),
+            // حساب الإحصائيات
+            final pendingCount = allLeaves
+                .where((r) => r['status'] == 'pending')
+                .length;
+            final approvedCount = allLeaves
+                .where((r) => r['status'] == 'approved')
+                .length;
+            final rejectedCount = allLeaves
+                .where((r) => r['status'] == 'rejected')
+                .length;
 
-              // ── 3. List of Requests ──
-              if (filteredLeaves.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Symbols.event_busy_rounded,
-                          size: 56,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: TashilSpacing.lg),
-                        Text(
-                          _selectedStatusFilter == 'all'
-                              ? AppLocalizations.of(context)!.reqEmptyAll
-                              : AppLocalizations.of(context)!.reqEmptyFilter,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          AppLocalizations.of(context)!.reqEmptyHint,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+            // المقترح 5: احتساب رصيد الإجازات السنوي المستهلك والمتبقي للعام الحالي
+            final currentYear = DateTime.now().year;
+            // TAS-313: السنوية بس، بنفس تعريف مسير الرواتب.
+            final usedLeaveDaysThisYear =
+                PayrollDayRules.usedAnnualLeaveDaysInYear(
+                  allLeaves,
+                  currentYear,
+                );
+            final remainingBalance = (_annualLeaveQuota - usedLeaveDaysThisYear)
+                .clamp(0, _annualLeaveQuota);
+            _currentRemainingBalance = remainingBalance;
+
+            // فلترة القائمة حسب التبويب
+            final filteredLeaves = allLeaves.where((req) {
+              final status = (req['status'] ?? 'pending').toString();
+              if (_selectedStatusFilter != 'all' &&
+                  status != _selectedStatusFilter) {
+                return false;
+              }
+              return true;
+            }).toList();
+
+            return M3Refresh(
+              onRefresh: _refresh,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  // ── 1. Leave Balance & KPI Summary Cards ──
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // كارت رصيد الإجازات السنوي أو كارت فترة التجربة (الإجازات الأسبوعية فقط)
+                          if (_isAnnualLeaveEnabled)
+                            _buildAnnualBalanceCard(
+                              usedDays: usedLeaveDaysThisYear,
+                              remainingDays: remainingBalance,
+                              totalQuota: _annualLeaveQuota,
+                              colorScheme: colorScheme,
+                            )
+                          else
+                            _buildProbationWeeklyLeavesCard(
+                              colorScheme: colorScheme,
+                              theme: theme,
+                              isArabic: isArabic,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(
-                    TashilSpacing.page,
-                    TashilSpacing.xs,
-                    TashilSpacing.page,
-                    96,
-                  ),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final req = filteredLeaves[index];
-                        return _buildRequestCard(
-                          req: req,
-                          colorScheme: colorScheme,
-                          theme: theme,
-                          isArabic: isArabic,
-                        );
-                      },
-                      childCount: filteredLeaves.length,
+
+                  // ── 2. Filter Button Group (مجموعة أزرار متصلة بدون سكرول) ──
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.symmetric(
+                        vertical: TashilSpacing.xs,
+                      ),
+                      child: _buildFilterButtonGroup(
+                        totalCount: allLeaves.length,
+                        pendingCount: pendingCount,
+                        approvedCount: approvedCount,
+                        rejectedCount: rejectedCount,
+                        colorScheme: colorScheme,
+                      ),
                     ),
                   ),
-                ),
-            ],
-          );
-        },
-      ),
+
+                  // ── 3. List of Requests ──
+                  if (filteredLeaves.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Symbols.event_busy_rounded,
+                              size: 56,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: TashilSpacing.lg),
+                            Text(
+                              _selectedStatusFilter == 'all'
+                                  ? AppLocalizations.of(context)!.reqEmptyAll
+                                  : AppLocalizations.of(
+                                      context,
+                                    )!.reqEmptyFilter,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              AppLocalizations.of(context)!.reqEmptyHint,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: TashilSpacing.lg),
+                            FilledButton.tonalIcon(
+                              key: const Key('requests_empty_new'),
+                              onPressed: () =>
+                                  _showCreateRequestDialog(context),
+                              icon: const Icon(Symbols.add_rounded),
+                              label: Text(
+                                AppLocalizations.of(context)!.newRequest,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        TashilSpacing.page,
+                        TashilSpacing.xs,
+                        TashilSpacing.page,
+                        96,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final req = filteredLeaves[index];
+                          return _buildRequestCard(
+                            req: req,
+                            colorScheme: colorScheme,
+                            theme: theme,
+                            isArabic: isArabic,
+                          );
+                        }, childCount: filteredLeaves.length),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -437,13 +476,16 @@ class _DelegateLeavesAndRequestsScreenState
     ),
     child: Text(
       text,
-      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-        color: onContainer,
-      ),
+      style: Theme.of(
+        context,
+      ).textTheme.labelMedium?.copyWith(color: onContainer),
     ),
   );
 
   // ── Probation Weekly Leaves Card (نظام الإجازات الأسبوعية فقط) ──
+  /// Weekly-off plan (probation): compact by default, the details open on
+  /// tap (user review 27 Nov 2026). Nothing here is counted yet, so it has
+  /// no progress bar; the annual card carries one.
   Widget _buildProbationWeeklyLeavesCard({
     required ColorScheme colorScheme,
     required ThemeData theme,
@@ -452,79 +494,93 @@ class _DelegateLeavesAndRequestsScreenState
     final tt = theme.textTheme;
     final l10n = AppLocalizations.of(context)!;
     return Card.filled(
+      key: const Key('requests_plan_card'),
       margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(TashilSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _cardIcon(Symbols.event_repeat_rounded, colorScheme),
-                const SizedBox(width: TashilSpacing.md),
-                Expanded(
-                  child: Text(l10n.weeklyOffPlan, style: tt.titleSmall),
-                ),
-                _label(
-                  l10n.daysOffPerMonth,
-                  colorScheme.secondaryContainer,
-                  colorScheme.onSecondaryContainer,
-                ),
-              ],
-            ),
-            const SizedBox(height: TashilSpacing.md),
-            Row(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => setState(() => _planExpanded = !_planExpanded),
+        child: Padding(
+          padding: const EdgeInsets.all(TashilSpacing.lg),
+          child: AnimatedSize(
+            duration: MediaQuery.maybeDisableAnimationsOf(context) == true
+                ? Duration.zero
+                : const Duration(milliseconds: 250),
+            alignment: AlignmentDirectional.topStart,
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Symbols.info_rounded,
-                  size: 16,
-                  color: colorScheme.onSurfaceVariant,
+                Row(
+                  children: [
+                    _cardIcon(Symbols.event_repeat_rounded, colorScheme),
+                    const SizedBox(width: TashilSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.weeklyOffPlan, style: tt.titleMedium),
+                          Text(
+                            l10n.daysOffPerMonth,
+                            style: tt.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _planExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      child: Icon(
+                        Symbols.expand_more_rounded,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: TashilSpacing.sm),
-                Expanded(
-                  child: Text(
+                if (_planExpanded) ...[
+                  const SizedBox(height: TashilSpacing.md),
+                  Text(
                     l10n.weeklyPlanNote,
                     style: tt.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ),
+                  const SizedBox(height: TashilSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildLeaveFeaturePill(
+                          icon: Symbols.calendar_today_rounded,
+                          label: l10n.weeklyDayOff,
+                          sublabel: l10n.oneDayEvery7,
+                          colorScheme: colorScheme,
+                        ),
+                      ),
+                      const SizedBox(width: TashilSpacing.sm),
+                      Expanded(
+                        child: _buildLeaveFeaturePill(
+                          icon: Symbols.schedule_rounded,
+                          label: l10n.hourlyPermission,
+                          sublabel: l10n.availableLabel,
+                          colorScheme: colorScheme,
+                        ),
+                      ),
+                      const SizedBox(width: TashilSpacing.sm),
+                      Expanded(
+                        child: _buildLeaveFeaturePill(
+                          icon: Symbols.lock_clock_rounded,
+                          label: l10n.annualBalance21,
+                          sublabel: l10n.onceActivated,
+                          colorScheme: colorScheme,
+                          isMuted: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
-            const SizedBox(height: TashilSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildLeaveFeaturePill(
-                    icon: Symbols.calendar_today_rounded,
-                    label: l10n.weeklyDayOff,
-                    sublabel: l10n.oneDayEvery7,
-                    colorScheme: colorScheme,
-                  ),
-                ),
-                const SizedBox(width: TashilSpacing.sm),
-                Expanded(
-                  child: _buildLeaveFeaturePill(
-                    icon: Symbols.schedule_rounded,
-                    label: l10n.hourlyPermission,
-                    sublabel: l10n.availableLabel,
-                    colorScheme: colorScheme,
-                  ),
-                ),
-                const SizedBox(width: TashilSpacing.sm),
-                Expanded(
-                  child: _buildLeaveFeaturePill(
-                    icon: Symbols.lock_clock_rounded,
-                    label: l10n.annualBalance21,
-                    sublabel: l10n.onceActivated,
-                    colorScheme: colorScheme,
-                    isMuted: true,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -573,9 +629,8 @@ class _DelegateLeavesAndRequestsScreenState
     );
   }
 
-  /// TAS-353 (C-06): the status filter is one row of single-select
-  /// FilterChips «label · count» (the separate KPI row with the same
-  /// numbers is gone).
+  /// Status filter: 2-5 exclusive options, so a connected ButtonGroup
+  /// (C-05) across the width, each with its count (user review 27 Nov).
   Widget _buildFilterButtonGroup({
     required int totalCount,
     required int pendingCount,
@@ -586,261 +641,243 @@ class _DelegateLeavesAndRequestsScreenState
     final l10n = AppLocalizations.of(context)!;
     final options = [
       ('all', l10n.filterAll, totalCount),
-      ('pending', l10n.statusPendingReview, pendingCount),
-      ('approved', l10n.statusApprovedPl, approvedCount),
-      ('rejected', l10n.statusRejectedPl, rejectedCount),
+      ('pending', l10n.reqFilterPending, pendingCount),
+      ('approved', l10n.statusApproved, approvedCount),
+      ('rejected', l10n.statusRejected, rejectedCount),
     ];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsetsDirectional.symmetric(
         horizontal: TashilSpacing.page,
       ),
-      child: Row(
-        children: [
-          for (final (key, label, count) in options) ...[
-            if (key != 'all') const SizedBox(width: TashilSpacing.sm),
-            FilterChip(
+      child: ButtonGroup<String>(
+        key: const Key('requests_filter'),
+        variant: ButtonGroupVariant.connected,
+        expand: true,
+        selected: {_selectedStatusFilter},
+        onSelectionChanged: (v) =>
+            setState(() => _selectedStatusFilter = v.first),
+        items: [
+          for (final (key, label, count) in options)
+            ButtonGroupItem(
               key: ValueKey('requests_filter_$key'),
-              selected: _selectedStatusFilter == key,
-              label: Text('$label · $count'),
-              onSelected: (_) =>
-                  setState(() => _selectedStatusFilter = key),
+              value: key,
+              label: '$label ${Bidi.ltr('$count')}',
             ),
-          ],
         ],
       ),
     );
   }
 
+  /// Everything the card and the details page show about one request.
+  _RequestView _viewOf(Map<String, dynamic> req) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final semantic = Theme.of(context).extension<TashilSemanticColors>();
+    final locale = Localizations.localeOf(context).languageCode;
+    DateTime? dt(Object? v) => v is Timestamp ? v.toDate() : null;
+
+    final status = (req['status'] ?? 'pending').toString();
+    final type = (req['type'] ?? 'annual').toString();
+    final isHourly = req['isHourly'] == true;
+    final hours = (req['hoursCount'] as num?)?.toDouble() ?? 0;
+    final days = (req['daysCount'] as num?)?.toInt() ?? 1;
+    final start = dt(req['startDate']);
+    final end = dt(req['endDate']) ?? start;
+
+    final (String typeLabel, IconData typeIcon) = switch (type) {
+      'sick' => (l10n.leaveSick, Symbols.medical_services_rounded),
+      'emergency' => (l10n.leaveEmergency, Symbols.emergency_home_rounded),
+      'delay' => (l10n.excuseLate, Symbols.timer_rounded),
+      'early_leave' => (l10n.excuseEarlyLeave, Symbols.logout_rounded),
+      'absence' => (l10n.excuseAbsence, Symbols.person_off_rounded),
+      'unpaid' => (l10n.leaveUnpaid, Symbols.money_off_rounded),
+      _ => (l10n.leaveAnnual, Symbols.beach_access_rounded),
+    };
+
+    // «20 – 21 نوفمبر», no arrow emoji between the dates.
+    String period = '';
+    if (start != null) {
+      final sameDay =
+          end == null ||
+          (end.year == start.year &&
+              end.month == start.month &&
+              end.day == start.day);
+      if (sameDay) {
+        period = DateFormat('EEEE، d MMMM', locale).format(start);
+      } else if (end.month == start.month && end.year == start.year) {
+        period = '${start.day} – ${DateFormat('d MMMM', locale).format(end)}';
+      } else {
+        period =
+            '${DateFormat('d MMM', locale).format(start)} – ${DateFormat('d MMM', locale).format(end)}';
+      }
+    }
+
+    // «ساعة / ساعتين / 3 ساعات», never «1.0 ساعة» (user review 27 Nov).
+    // One and two read as the word alone; more is the number + plural.
+    final whole = hours == hours.roundToDouble();
+    final n = isHourly ? hours.round() : days;
+    final h = whole ? '${hours.toInt()}' : hours.toStringAsFixed(1);
+    final word = (!isHourly || whole) && (n == 1 || n == 2);
+    final amount = word
+        ? (isHourly ? l10n.reqHoursWord(n) : l10n.reqDaysWord(n))
+        : (isHourly ? h : '$days');
+    final unit = word
+        ? l10n.reqDurationLabel
+        : (isHourly ? l10n.reqHoursWord(n) : l10n.reqDaysWord(n));
+    final (Color bg, Color fg, String label) = switch (status) {
+      'approved' => (
+        semantic?.successContainer ?? cs.primaryContainer,
+        semantic?.onSuccessContainer ?? cs.onPrimaryContainer,
+        l10n.statusApproved,
+      ),
+      'rejected' => (
+        cs.errorContainer,
+        cs.onErrorContainer,
+        l10n.statusRejected,
+      ),
+      // Waiting for an answer: the warning pair, visible on the card.
+      _ => (
+        semantic?.warningContainer ?? cs.secondaryContainer,
+        semantic?.onWarningContainer ?? cs.onSecondaryContainer,
+        l10n.statusPending,
+      ),
+    };
+
+    return _RequestView(
+      docId: (req['docId'] ?? '').toString(),
+      status: status,
+      typeLabel: typeLabel,
+      typeIcon: typeIcon,
+      period: period,
+      amount: amount,
+      unit: unit,
+      from: isHourly
+          ? (req['fromTime'] ?? '').toString()
+          : (start != null ? DateFormat('d MMM', locale).format(start) : ''),
+      to: isHourly
+          ? (req['toTime'] ?? '').toString()
+          : (end != null ? DateFormat('d MMM', locale).format(end) : ''),
+      reason: (req['reason'] ?? '').toString(),
+      rejectReason: (req['rejectReason'] ?? '').toString(),
+      resolvedByName: (req['resolvedByName'] ?? '').toString(),
+      resolvedAt: dt(req['resolvedAt']),
+      // TAS-42: new requests carry the Storage path; old ones only a URL.
+      attachmentUrl: StorageMediaRef.pick(
+        path: req['attachmentPath'],
+        url: req['attachmentUrl'],
+      ),
+      statusBg: bg,
+      statusFg: fg,
+      statusLabel: label,
+    );
+  }
+
+  /// The request as a SummaryCard (P-07, user review 27 Nov 2026): type and
+  /// period, the amount large on the end side, the status label, from / to
+  /// across the card, item actions in a ⋮ menu (C-24). A tap opens the
+  /// details with a container transform (motion: OpenContainer).
   Widget _buildRequestCard({
     required Map<String, dynamic> req,
     required ColorScheme colorScheme,
     required ThemeData theme,
     required bool isArabic,
   }) {
-    final docId = (req['docId'] ?? '').toString();
-    final isExpanded = _expandedDocIds.contains(docId);
-
-    final status = (req['status'] ?? 'pending').toString();
-    final type = (req['type'] ?? 'annual').toString();
-    final isHourly = req['isHourly'] == true;
-    final hoursCount = (req['hoursCount'] as num?)?.toDouble() ?? 0;
-    final daysCount = (req['daysCount'] as num?)?.toInt() ?? 1;
-    final reason = (req['reason'] ?? '').toString();
-    final rejectReason = (req['rejectReason'] ?? '').toString();
-    // TAS-42: new requests carry the Storage path; old ones only a URL.
-    final attachmentUrl = StorageMediaRef.pick(
-      path: req['attachmentPath'],
-      url: req['attachmentUrl'],
-    );
-    final resolvedByName = (req['resolvedByName'] ?? '').toString();
-    final resolvedAt = req['resolvedAt'] is Timestamp
-        ? (req['resolvedAt'] as Timestamp).toDate()
+    final v = _viewOf(req);
+    final l10n = AppLocalizations.of(context)!;
+    final menu = (v.status == 'pending' || v.attachmentUrl.isNotEmpty)
+        ? MenuAnchor(
+            builder: (context, controller, _) => IconButton(
+              key: ValueKey('request_menu_${v.docId}'),
+              icon: const Icon(Symbols.more_vert_rounded),
+              tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+              onPressed: () =>
+                  controller.isOpen ? controller.close() : controller.open(),
+            ),
+            menuChildren: [
+              if (v.attachmentUrl.isNotEmpty)
+                MenuItemButton(
+                  leadingIcon: const Icon(Symbols.attachment_rounded),
+                  onPressed: () => _viewAttachment(context, v.attachmentUrl),
+                  child: Text(l10n.previewAttachment),
+                ),
+              if (v.status == 'pending')
+                MenuItemButton(
+                  leadingIcon: const Icon(Symbols.delete_outline_rounded),
+                  onPressed: () => _cancelPendingRequest(context, v.docId),
+                  child: Text(l10n.cancelRequest),
+                ),
+            ],
+          )
         : null;
 
-    // Formatting dates
-    String periodStr = '';
-    if (isHourly) {
-      final start = req['startDate'] is Timestamp
-          ? (req['startDate'] as Timestamp).toDate()
-          : DateTime.now();
-      final dateStr = DateFormat('yyyy/MM/dd').format(start);
-      final fromTime = (req['fromTime'] ?? '').toString();
-      final toTime = (req['toTime'] ?? '').toString();
-      if (fromTime.isNotEmpty && toTime.isNotEmpty) {
-        periodStr = '$dateStr • ($fromTime - $toTime)';
-      } else {
-        periodStr = AppLocalizations.of(context)!.dateWithHours(dateStr, hoursCount);
-      }
-    } else {
-      final start = req['startDate'] is Timestamp
-          ? (req['startDate'] as Timestamp).toDate()
-          : null;
-      final end = req['endDate'] is Timestamp
-          ? (req['endDate'] as Timestamp).toDate()
-          : null;
-      if (start != null && end != null) {
-        final fStart = DateFormat('yyyy/MM/dd').format(start);
-        final fEnd = DateFormat('yyyy/MM/dd').format(end);
-        periodStr = fStart == fEnd ? fStart : '$fStart ⬅️ $fEnd';
-      }
-    }
-
-    // Type definition
-    String typeLabel;
-    IconData typeIcon;
-    switch (type) {
-      case 'sick':
-        typeLabel = AppLocalizations.of(context)!.leaveSick;
-        typeIcon = Symbols.medical_services_rounded;
-        break;
-      case 'emergency':
-        typeLabel = AppLocalizations.of(context)!.leaveEmergency;
-        typeIcon = Symbols.warning_amber_rounded;
-        break;
-      case 'delay':
-        typeLabel = AppLocalizations.of(context)!.excuseLate;
-        typeIcon = Symbols.timer_rounded;
-        break;
-      case 'early_leave':
-        typeLabel = AppLocalizations.of(context)!.excuseEarlyLeave;
-        typeIcon = Symbols.logout_rounded;
-        break;
-      case 'absence':
-        typeLabel = AppLocalizations.of(context)!.excuseAbsence;
-        typeIcon = Symbols.person_off_rounded;
-        break;
-      case 'unpaid':
-        typeLabel = AppLocalizations.of(context)!.leaveUnpaid;
-        typeIcon = Symbols.money_off_rounded;
-        break;
-      default:
-        typeLabel = AppLocalizations.of(context)!.leaveAnnual;
-        typeIcon = Symbols.beach_access_rounded;
-        break;
-    }
-
-    // TAS-353: status is a compact label (container role + on colour);
-    // rejected is the only error, pending is neutral, approved is success.
-    final semantic = Theme.of(context).extension<TashilSemanticColors>();
-    final l10n = AppLocalizations.of(context)!;
-    final tt = theme.textTheme;
-    final (Color statusBg, Color statusFg, String statusLabel) =
-        switch (status) {
-      'approved' => (
-        semantic?.successContainer ?? colorScheme.primaryContainer,
-        semantic?.onSuccessContainer ?? colorScheme.onPrimaryContainer,
-        l10n.statusApproved,
-      ),
-      'rejected' => (
-        colorScheme.errorContainer,
-        colorScheme.onErrorContainer,
-        l10n.statusRejected,
-      ),
-      _ => (
-        colorScheme.surfaceContainerHighest,
-        colorScheme.onSurfaceVariant,
-        l10n.statusPending,
-      ),
-    };
-
-    final durationText = isHourly
-        ? l10n.hoursCount(hoursCount)
-        : l10n.daysCount(daysCount);
-
-    return Card.filled(
-      key: ValueKey('request_card_$docId'),
-      margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            if (isExpanded) {
-              _expandedDocIds.remove(docId);
-            } else {
-              _expandedDocIds.add(docId);
-            }
-          });
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(TashilSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  _cardIcon(typeIcon, colorScheme),
-                  const SizedBox(width: TashilSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '$typeLabel · $durationText',
-                          style: tt.titleSmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: TashilSpacing.xs / 2),
-                        Text(
-                          periodStr,
-                          style: tt.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: TashilSpacing.sm),
-                  _label(statusLabel, statusBg, statusFg),
-                  AnimatedRotation(
-                    turns: isExpanded ? 0.5 : 0.0,
-                    duration: AppMotionDurations.short4,
-                    child: Icon(
-                      Symbols.expand_more_rounded,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-              if (isExpanded) ...[
-                const Divider(height: TashilSpacing.xl),
-                if (reason.isNotEmpty)
-                  Text(
-                    l10n.reasonLabel(reason),
-                    style: tt.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                if (status == 'rejected' && rejectReason.isNotEmpty) ...[
-                  const SizedBox(height: TashilSpacing.sm),
-                  Text(
-                    l10n.rejectReasonLabel(rejectReason),
-                    style: tt.bodyMedium?.copyWith(color: colorScheme.error),
-                  ),
-                ],
-                if (status == 'approved' && resolvedByName.isNotEmpty) ...[
-                  const SizedBox(height: TashilSpacing.sm),
-                  Text(
-                    resolvedAt != null
-                        ? '${l10n.approvedBy(resolvedByName)} (${DateFormat('yyyy/MM/dd').format(resolvedAt)})'
-                        : l10n.approvedBy(resolvedByName),
-                    style: tt.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                if (attachmentUrl.isNotEmpty || status == 'pending') ...[
-                  const SizedBox(height: TashilSpacing.sm),
-                  Row(
-                    children: [
-                      if (attachmentUrl.isNotEmpty)
-                        OutlinedButton.icon(
-                          icon: const Icon(Symbols.attachment_rounded),
-                          label: Text(l10n.previewAttachment),
-                          onPressed: () =>
-                              _viewAttachment(context, attachmentUrl),
-                        ),
-                      const Spacer(),
-                      if (status == 'pending')
-                        TextButton.icon(
-                          icon: const Icon(Symbols.delete_outline_rounded),
-                          label: Text(l10n.cancelRequest),
-                          onPressed: () =>
-                              _cancelPendingRequest(context, req['docId']),
-                        ),
-                    ],
-                  ),
-                ],
-              ],
-            ],
-          ),
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
+      child: OpenContainer<void>(
+        key: ValueKey('request_card_${v.docId}'),
+        closedElevation: 0,
+        openElevation: 0,
+        closedColor: colorScheme.surfaceContainerHighest,
+        openColor: colorScheme.surface,
+        middleColor: colorScheme.surface,
+        closedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TashilRadius.medium),
+        ),
+        transitionDuration: MediaQuery.maybeDisableAnimationsOf(context) == true
+            ? Duration.zero
+            : const Duration(milliseconds: 400),
+        closedBuilder: (context, open) =>
+            _requestSummary(v, onTap: open, action: menu),
+        openBuilder: (context, close) => _RequestDetailsPage(
+          view: v,
+          summary: _requestSummary(v),
+          onPreview: v.attachmentUrl.isEmpty
+              ? null
+              : () => _viewAttachment(context, v.attachmentUrl),
+          onCancel: v.status == 'pending'
+              ? () async {
+                  await _cancelPendingRequest(context, v.docId);
+                  if (context.mounted) close();
+                }
+              : null,
         ),
       ),
+    );
+  }
+
+  Widget _requestSummary(
+    _RequestView v, {
+    VoidCallback? onTap,
+    Widget? action,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    return SummaryCard(
+      margin: EdgeInsets.zero,
+      onTap: onTap,
+      action: action,
+      icon: v.typeIcon,
+      title: v.typeLabel,
+      subtitle: v.period,
+      labels: [
+        SummaryLabel(
+          v.statusLabel,
+          container: v.statusBg,
+          onContainer: v.statusFg,
+        ),
+      ],
+      trailingValue: v.amount,
+      trailingCaption: v.unit,
+      facts: [
+        SummaryFact(
+          icon: Symbols.line_start_circle_rounded,
+          label: l10n.fromField,
+          value: v.from.isEmpty ? '—' : v.from,
+        ),
+        SummaryFact(
+          icon: Symbols.line_end_circle_rounded,
+          label: l10n.toField,
+          value: v.to.isEmpty ? '—' : v.to,
+        ),
+      ],
     );
   }
 
@@ -875,9 +912,7 @@ class _DelegateLeavesAndRequestsScreenState
           .doc(docId)
           .delete();
 
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.requestCancelled)),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(l10n.requestCancelled)));
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.cancelRequestFailed(e))),
@@ -890,7 +925,9 @@ class _DelegateLeavesAndRequestsScreenState
     showTashilDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(HrRadius.card),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -923,21 +960,23 @@ class _DelegateLeavesAndRequestsScreenState
                   pathOrUrl: url,
                   builder: (_, resolved) => Image.network(
                     resolved,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (_, child, progress) {
-                    if (progress == null) return child;
-                    return const SizedBox(
-                      height: 240,
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  },
-                  errorBuilder: (_, _, _) => SizedBox(
-                    height: 160,
-                    child: Center(
-                      child: Text(AppLocalizations.of(context)!.attachmentLoadFailed),
+                    fit: BoxFit.contain,
+                    loadingBuilder: (_, child, progress) {
+                      if (progress == null) return child;
+                      return const SizedBox(
+                        height: 240,
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    },
+                    errorBuilder: (_, _, _) => SizedBox(
+                      height: 160,
+                      child: Center(
+                        child: Text(
+                          AppLocalizations.of(context)!.attachmentLoadFailed,
+                        ),
+                      ),
                     ),
                   ),
-                ),
                 ),
               ),
             ),
@@ -983,7 +1022,8 @@ class _DelegateLeavesAndRequestsScreenState
           final colorScheme = theme.colorScheme;
           final textTheme = theme.textTheme;
           final semantic = theme.extension<TashilSemanticColors>();
-          final isLeaveType = selectedType == 'annual' ||
+          final isLeaveType =
+              selectedType == 'annual' ||
               selectedType == 'sick' ||
               selectedType == 'emergency' ||
               selectedType == 'unpaid';
@@ -991,15 +1031,16 @@ class _DelegateLeavesAndRequestsScreenState
             isHourly = true;
           }
           final calculatedDays = endDate.difference(startDate).inDays + 1;
-          final dirty = touched ||
+          final dirty =
+              touched ||
               selectedType != initialType ||
               reasonCtrl.text.trim().isNotEmpty ||
               pickedAttachment != null;
 
           void edit(VoidCallback change) => setDlgState(() {
-                touched = true;
-                change();
-              });
+            touched = true;
+            change();
+          });
 
           Future<void> submit() async {
             final reason = reasonCtrl.text.trim();
@@ -1011,10 +1052,12 @@ class _DelegateLeavesAndRequestsScreenState
               showTashilSnackBar(context, l10n.annualNotActive);
               return;
             }
-            final String? fromTimeFormatted =
-                isHourly ? fromTime.format(context) : null;
-            final String? toTimeFormatted =
-                isHourly ? toTime.format(context) : null;
+            final String? fromTimeFormatted = isHourly
+                ? fromTime.format(context)
+                : null;
+            final String? toTimeFormatted = isHourly
+                ? toTime.format(context)
+                : null;
 
             setDlgState(() => isSubmitting = true);
             try {
@@ -1026,8 +1069,8 @@ class _DelegateLeavesAndRequestsScreenState
                 final fileName =
                     '${DateTime.now().millisecondsSinceEpoch}_${pickedAttachment!.name}';
                 final storageRef = FirebaseStorage.instance.ref().child(
-                      'leave_attachments/${widget.delegate.companyUID}/${widget.delegate.uid}/$fileName',
-                    );
+                  'leave_attachments/${widget.delegate.companyUID}/${widget.delegate.uid}/$fileName',
+                );
                 final metadata = SettableMetadata(
                   contentType: 'image/jpeg',
                   customMetadata: {
@@ -1096,9 +1139,7 @@ class _DelegateLeavesAndRequestsScreenState
                   companyUID: widget.delegate.companyUID,
                 );
                 if (notifUid != null) {
-                  await FirebaseFirestore.instance
-                      .collection('notifications')
-                      .add({
+                  await FirebaseFirestore.instance.collection('notifications').add({
                     'delegateUid': notifUid,
                     'companyUID': widget.delegate.companyUID,
                     'organizationUID': widget.delegate.organizationUID,
@@ -1131,47 +1172,49 @@ class _DelegateLeavesAndRequestsScreenState
           }
 
           Widget sectionLabel(String text) => Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  top: TashilSpacing.lg,
-                  bottom: TashilSpacing.sm,
-                ),
-                child: Text(
-                  text,
-                  style: textTheme.titleSmall?.copyWith(
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              );
+            padding: const EdgeInsetsDirectional.only(
+              top: TashilSpacing.lg,
+              bottom: TashilSpacing.sm,
+            ),
+            child: Text(
+              text,
+              style: textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurface,
+              ),
+            ),
+          );
 
           Widget note(String text) => Container(
-                padding: const EdgeInsets.all(TashilSpacing.md),
-                decoration: BoxDecoration(
-                  color: semantic?.warningContainer ??
-                      colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(TashilRadius.medium),
+            padding: const EdgeInsets.all(TashilSpacing.md),
+            decoration: BoxDecoration(
+              color:
+                  semantic?.warningContainer ?? colorScheme.tertiaryContainer,
+              borderRadius: BorderRadius.circular(TashilRadius.medium),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Symbols.info_rounded,
+                  size: 18,
+                  color:
+                      semantic?.onWarningContainer ??
+                      colorScheme.onTertiaryContainer,
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Symbols.info_rounded,
-                      size: 18,
-                      color: semantic?.onWarningContainer ??
+                const SizedBox(width: TashilSpacing.sm),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: textTheme.bodySmall?.copyWith(
+                      color:
+                          semantic?.onWarningContainer ??
                           colorScheme.onTertiaryContainer,
                     ),
-                    const SizedBox(width: TashilSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        text,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: semantic?.onWarningContainer ??
-                              colorScheme.onTertiaryContainer,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              );
+              ],
+            ),
+          );
 
           return FormDialog(
             title: l10n.newRequest,
@@ -1388,6 +1431,109 @@ class _DelegateLeavesAndRequestsScreenState
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// What the requests list and the details page show for one request.
+class _RequestView {
+  const _RequestView({
+    required this.docId,
+    required this.status,
+    required this.typeLabel,
+    required this.typeIcon,
+    required this.period,
+    required this.amount,
+    required this.unit,
+    required this.from,
+    required this.to,
+    required this.reason,
+    required this.rejectReason,
+    required this.resolvedByName,
+    required this.resolvedAt,
+    required this.attachmentUrl,
+    required this.statusBg,
+    required this.statusFg,
+    required this.statusLabel,
+  });
+  final String docId, status, typeLabel, period, amount, unit, from, to;
+  final String reason, rejectReason, resolvedByName, attachmentUrl, statusLabel;
+  final IconData typeIcon;
+  final DateTime? resolvedAt;
+  final Color statusBg, statusFg;
+}
+
+/// Details of one request, opened from its card with a container transform.
+class _RequestDetailsPage extends StatelessWidget {
+  const _RequestDetailsPage({
+    required this.view,
+    required this.summary,
+    this.onPreview,
+    this.onCancel,
+  });
+  final _RequestView view;
+  final Widget summary;
+  final VoidCallback? onPreview;
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    Widget section(String title, String body, {Color? color}) => Padding(
+      padding: const EdgeInsetsDirectional.only(top: TashilSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: tt.titleSmall),
+          const SizedBox(height: TashilSpacing.xs),
+          Text(
+            body,
+            style: tt.bodyLarge?.copyWith(color: color ?? cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+    final decided = view.resolvedByName.isNotEmpty
+        ? (view.resolvedAt != null
+              ? '${view.resolvedByName} · ${DateFormat('d MMMM', Localizations.localeOf(context).languageCode).format(view.resolvedAt!)}'
+              : view.resolvedByName)
+        : '';
+    return Scaffold(
+      appBar: AppBar(title: Text(view.typeLabel)),
+      body: ListView(
+        key: const Key('request_details'),
+        padding: const EdgeInsets.all(TashilSpacing.page),
+        children: [
+          summary,
+          if (view.reason.isNotEmpty) section(l10n.reasonField, view.reason),
+          if (view.status == 'rejected' && view.rejectReason.isNotEmpty)
+            section(
+              l10n.reqRejectReasonTitle,
+              view.rejectReason,
+              color: cs.error,
+            ),
+          if (decided.isNotEmpty) section(l10n.reqDecidedBy, decided),
+          if (onPreview != null) ...[
+            const SizedBox(height: TashilSpacing.lg),
+            OutlinedButton.icon(
+              onPressed: onPreview,
+              icon: const Icon(Symbols.attachment_rounded),
+              label: Text(l10n.previewAttachment),
+            ),
+          ],
+          if (onCancel != null) ...[
+            const SizedBox(height: TashilSpacing.xl),
+            FilledButton.tonalIcon(
+              key: const Key('request_details_cancel'),
+              onPressed: onCancel,
+              icon: const Icon(Symbols.delete_outline_rounded),
+              label: Text(l10n.cancelRequest),
+            ),
+          ],
+        ],
       ),
     );
   }

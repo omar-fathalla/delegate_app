@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
@@ -5,7 +6,6 @@ import 'package:material_ui/material_ui.dart';
 import '../services/photo_cache_manager.dart';
 import '../storage/storage_media.dart';
 import '../utils/image_url_helper.dart';
-import 'app_loading_indicator.dart';
 
 class AppPhotoImage extends StatefulWidget {
   final String photoUrl;
@@ -87,6 +87,16 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
     }
   }
 
+  /// While the photo loads: a skeleton the size of the photo (playground
+  /// «هيكل التحميل», TAS-387), not a spinner.
+  Widget _loadingSkeleton() => LayoutBuilder(
+    builder: (context, c) => Skeleton(
+      radius: 0,
+      width: widget.width ?? (c.hasBoundedWidth ? c.maxWidth : 160),
+      height: widget.height ?? (c.hasBoundedHeight ? c.maxHeight : 160),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -121,13 +131,7 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
           fit: widget.fit,
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
-            return Center(
-              child: AppLoadingIndicator(
-                size: widget.isThumbnail ? 16 : 28,
-                color: colorScheme.primary,
-                style: AppLoadingStyle.threeArchedCircle,
-              ),
-            );
+            return _loadingSkeleton();
           },
           errorBuilder: (context, error, stackTrace) => Image.network(
             networkUrl,
@@ -150,13 +154,7 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
         memCacheHeight: widget.isThumbnail ? 350 : null,
         maxHeightDiskCache: widget.isThumbnail ? 600 : 1800,
         maxWidthDiskCache: widget.isThumbnail ? 600 : 1800,
-        placeholder: (context, url) => Center(
-          child: AppLoadingIndicator(
-            size: widget.isThumbnail ? 16 : 28,
-            color: colorScheme.primary,
-            style: AppLoadingStyle.threeArchedCircle,
-          ),
-        ),
+        placeholder: (context, url) => _loadingSkeleton(),
         errorWidget: (context, url, error) {
           // Fallback to basic Image.network in case custom cache manager had a transient issue
           return Image.network(
@@ -166,13 +164,7 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
             fit: widget.fit,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
-              return Center(
-                child: AppLoadingIndicator(
-                  size: widget.isThumbnail ? 16 : 28,
-                  color: colorScheme.primary,
-                  style: AppLoadingStyle.threeArchedCircle,
-                ),
-              );
+              return _loadingSkeleton();
             },
             errorBuilder: (context, error, stackTrace) =>
                 widget.errorWidget ?? _defaultErrorWidget(colorScheme),
@@ -182,13 +174,7 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
       }
     } else {
       if (_isCheckingLocal) {
-        content = Center(
-          child: AppLoadingIndicator(
-            size: widget.isThumbnail ? 16 : 28,
-            color: colorScheme.primary,
-            style: AppLoadingStyle.threeArchedCircle,
-          ),
-        );
+        content = _loadingSkeleton();
       } else if (_resolvedLocalFile != null && _resolvedLocalFile!.existsSync()) {
         content = Image.file(
           _resolvedLocalFile!,
