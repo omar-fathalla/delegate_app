@@ -1,4 +1,5 @@
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
+import 'package:delegate_app/features/attendance/domain/missing_check_out_rule.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:geolocator/geolocator.dart';
@@ -53,6 +54,9 @@ class HRAttendanceRecord {
   final bool isAutoCheckOut;
   final String? autoCheckOutReason;
 
+  /// TAS-362: forgotten session, zero hours until HR sets the check-out.
+  final bool isMissingCheckOut;
+
   const HRAttendanceRecord({
     required this.delegate,
     this.checkInTime,
@@ -77,10 +81,13 @@ class HRAttendanceRecord {
     this.leaveType,
     this.isAutoCheckOut = false,
     this.autoCheckOutReason,
+    this.isMissingCheckOut = false,
   });
 
-  bool get isPresent => checkInTime != null && checkOutTime == null && !isAutoCheckOut;
-  bool get isDeparted => checkInTime != null && (checkOutTime != null || isAutoCheckOut);
+  bool get isPresent =>
+      checkInTime != null && checkOutTime == null && !isAutoCheckOut && !isMissingCheckOut;
+  bool get isDeparted =>
+      checkInTime != null && (checkOutTime != null || isAutoCheckOut || isMissingCheckOut);
   bool get isAbsent => checkInTime == null;
   bool get isOnLeave => isAbsent && isOnApprovedLeave;
 
@@ -104,6 +111,7 @@ class HRAttendanceRecord {
   /// صافي مدة العمل المحسوبة
   Duration? get duration {
     if (checkInTime == null) return null;
+    if (isMissingCheckOut) return Duration.zero;
     if (checkOutTime != null) {
       return checkOutTime!.difference(checkInTime!);
     }
@@ -123,6 +131,7 @@ class HRAttendanceRecord {
   /// صياغة نصية مفهومة لصافي ساعات العمل
   String get formattedDuration {
     if (checkInTime == null) return '-';
+    if (isMissingCheckOut) return 'انصراف مش متسجل';
     if (checkOutTime == null && !isAutoCheckOut) {
       final now = DateTime.now();
       final isToday = checkInTime!.year == now.year &&
@@ -431,6 +440,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     setState(() => _isLoading = true);
 
     try {
+      // TAS-362: start date of the «forgotten session = zero» rule.
+      await MissingCheckOutRule.ensureLoaded(FirebaseFirestore.instance);
       final startOfDay = DateTime(
         _selectedDate.year,
         _selectedDate.month,
@@ -636,8 +647,23 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
           }
         }
 
+        // TAS-362: from the rule date, a forgotten session counts zero until
+        // HR sets the check-out.
+        final bool isMissingCheckOut = checkIn != null &&
+            MissingCheckOutRule.isUnpaid(
+              checkIn: checkIn,
+              checkOut: checkOut,
+              flagged: MissingCheckOutRule.flaggedIn(logs),
+              manuallyAdjusted: MissingCheckOutRule.adjustedIn(logs),
+              now: DateTime.now(),
+            );
+        if (isMissingCheckOut) {
+          checkOut = null;
+          isAutoCheckOut = false;
+        }
+
         // قاعدة الإغلاق التلقائي: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (11.5 ساعة) أو كان تاريخاً سابقاً
-        if (checkIn != null && checkOut == null) {
+        if (checkIn != null && checkOut == null && !isMissingCheckOut) {
           final now = DateTime.now();
           final isPastDate = _selectedDate.isBefore(DateTime(now.year, now.month, now.day));
           final isElapsedAutoClose = now.difference(checkIn) >= kAttendanceAutoCloseAfter;
@@ -817,6 +843,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
             leaveType: leaveType,
             isAutoCheckOut: isAutoCheckOut,
             autoCheckOutReason: autoCheckOutReason,
+            isMissingCheckOut: isMissingCheckOut,
           ),
         );
       }

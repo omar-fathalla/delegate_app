@@ -2,6 +2,7 @@ import 'package:delegate_app/core/attendance/attendance_branch_ref.dart';
 import 'package:delegate_app/core/attendance/attendance_branch_resolve.dart';
 import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
+import 'package:delegate_app/features/attendance/domain/missing_check_out_rule.dart';
 import 'package:delegate_app/features/attendance/domain/attendance_action_messages.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
@@ -490,6 +491,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String? nationalityID,
     String? phoneNumber,
   }) async {
+    // TAS-362: start date of the «forgotten session = zero» rule.
+    await MissingCheckOutRule.ensureLoaded(firestore);
     final response = await getHistoryPaginated(
       userId,
       organizationId,
@@ -533,6 +536,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     int limit = 20,
     DocumentSnapshot? startAfter,
   }) async {
+    // TAS-362: start date of the «forgotten session = zero» rule.
+    await MissingCheckOutRule.ensureLoaded(firestore);
     try {
       final queryList = await _resolveHistoryIdentifiers(
         userId,
@@ -621,6 +626,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String? nationalityID,
     String? phoneNumber,
   }) async {
+    // TAS-362: start date of the «forgotten session = zero» rule.
+    await MissingCheckOutRule.ensureLoaded(firestore);
     final queryList = await _resolveHistoryIdentifiers(
       userId,
       nationalityID: nationalityID,
@@ -838,7 +845,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
       if (data['type'] == 'check_in') {
         // Denormalized checkout on the check-in doc (fix2) means session is closed.
-        if (data['checkOutTime'] != null) {
+        // TAS-362: so does a forgotten session the server marked.
+        if (data['checkOutTime'] != null || data['missingCheckOut'] == true) {
           return null;
         }
 
@@ -854,6 +862,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         }
 
         if (nowTime.difference(checkInTime) >= kAttendanceAutoCloseAfter) {
+          // TAS-362: under the new rule the server job marks the session
+          // (zero hours, HR sets the check-out); the app writes nothing.
+          await MissingCheckOutRule.ensureLoaded(firestore);
+          if (MissingCheckOutRule.from != null) return null;
           // انتهت مدة الشفت (11.5 ساعة) - إغلاق الجلسة تلقائياً في الخلفية وتحرير المندوب
           unawaited(
             _autoCheckOutExpiredSession(

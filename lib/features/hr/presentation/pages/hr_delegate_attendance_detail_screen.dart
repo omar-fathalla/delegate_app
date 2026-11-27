@@ -1,4 +1,5 @@
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
+import 'package:delegate_app/features/attendance/domain/missing_check_out_rule.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -51,6 +52,9 @@ class DelegateAttendanceSession {
   /// (radius + 50 m). Written by the attendance trigger, never by the app.
   final bool checkOutOutsideBranch;
   final double? checkOutDistanceMeters;
+  /// TAS-362: a forgotten session (no real check-out) counts zero hours
+  /// until HR sets the check-out. Shown as «انصراف مش متسجل».
+  final bool isMissingCheckOut;
 
   const DelegateAttendanceSession({
     required this.id,
@@ -74,17 +78,19 @@ class DelegateAttendanceSession {
     this.autoCheckOutReason,
     this.checkOutOutsideBranch = false,
     this.checkOutDistanceMeters,
+    this.isMissingCheckOut = false,
   });
 
   /// Duration worked in this session (if check-out exists)
   Duration? get duration {
+    if (isMissingCheckOut) return Duration.zero;
     if (checkOutTime == null) return null;
     return checkOutTime!.difference(checkInTime);
   }
 
   /// Whether the session is currently ongoing (today without checkout and within 9 hours)
   bool get isOngoing {
-    if (checkOutTime != null || isAutoCheckOut) return false;
+    if (checkOutTime != null || isAutoCheckOut || isMissingCheckOut) return false;
     final now = DateTime.now();
     return checkInTime.year == now.year &&
         checkInTime.month == now.month &&
@@ -94,6 +100,7 @@ class DelegateAttendanceSession {
 
   /// Formatted duration string e.g. "8 س و 15 د"
   String get formattedDuration {
+    if (isMissingCheckOut) return 'انصراف مش متسجل';
     final d = duration;
     if (d == null) {
       return isOngoing ? 'قيد العمل الآن' : 'غير مسجل';
@@ -533,6 +540,9 @@ class _HRDelegateAttendanceDetailScreenState
       if (clean.isNotEmpty) identifiers.add(clean);
     }
 
+    // TAS-362: start date of the «forgotten session = zero» rule.
+    await MissingCheckOutRule.ensureLoaded(_db);
+
     // Company-scoped, merged and deduplicated by document ID.
     final rawDocs = await fetchDelegateAttendanceDocs(
       firestore: _db,
@@ -677,8 +687,22 @@ class _HRDelegateAttendanceDetailScreenState
       String? autoCheckOutReason = checkOutData?['autoCheckOutReason']?.toString() ??
           checkInData['autoCheckOutReason']?.toString();
 
+      // TAS-362: from the rule date, a forgotten session counts zero until
+      // HR sets the check-out (no +11.5 h, and no «past day» shortcut).
+      final bool isMissingCheckOut = MissingCheckOutRule.isUnpaid(
+        checkIn: checkInTime,
+        checkOut: checkOutTime,
+        flagged: MissingCheckOutRule.flaggedIn([checkInData, checkOutData]),
+        manuallyAdjusted: MissingCheckOutRule.adjustedIn([checkInData, checkOutData]),
+        now: DateTime.now(),
+      );
+      if (isMissingCheckOut) {
+        checkOutTime = null;
+        isAutoCheckOut = false;
+      }
+
       // قاعدة الإغلاق التلقائي: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (11.5 ساعة) أو كان تاريخاً سابقاً
-      if (checkOutTime == null) {
+      if (checkOutTime == null && !isMissingCheckOut) {
         final now = DateTime.now();
         final isPastDay = checkInTime.isBefore(DateTime(now.year, now.month, now.day));
         final isElapsedAutoClose = now.difference(checkInTime) >= kAttendanceAutoCloseAfter;
@@ -754,6 +778,7 @@ class _HRDelegateAttendanceDetailScreenState
           autoCheckOutReason: autoCheckOutReason,
           checkOutOutsideBranch: serverOut.outside,
           checkOutDistanceMeters: serverOut.distanceMeters,
+          isMissingCheckOut: isMissingCheckOut,
         ),
       );
     }
@@ -1124,6 +1149,17 @@ class _HRDelegateAttendanceDetailScreenState
       if (notes.isNotEmpty) 'adjustmentNotes': notes,
       // Denormalize checkout onto check-in (fix2) when HR sets/adjusts out time.
       if (hasCheckOut && newOutTime != null) 'checkOutTime': Timestamp.fromDate(newOutTime),
+      // TAS-362: a check-out set by HR resolves a forgotten session, so it
+      // counts again (the flags would keep it at zero).
+      if (hasCheckOut && newOutTime != null) ...{
+        'missingCheckOut': FieldValue.delete(),
+        'isAutoCheckOut': FieldValue.delete(),
+        'autoCheckOutReason': FieldValue.delete(),
+        if (session.isMissingCheckOut) ...{
+          'missingCheckOutResolvedBy': hrName,
+          'missingCheckOutResolvedAt': FieldValue.serverTimestamp(),
+        },
+      },
       if (!hasCheckOut) 'checkOutTime': FieldValue.delete(),
       // Fix3: backfill display fields from HR-known delegate profile when possible.
       if (delegateDisplayName.isNotEmpty) 'delegateName': delegateDisplayName,
@@ -1172,6 +1208,9 @@ class _HRDelegateAttendanceDetailScreenState
             .doc(checkOutDocId);
         batch.update(outRef, {
           'timestamp': Timestamp.fromDate(newOutTime),
+          // TAS-362: no longer an automatic close.
+          'isAutoCheckOut': FieldValue.delete(),
+          'autoCheckOutReason': FieldValue.delete(),
           'isManuallyAdjusted': true,
           'lastAdjustedBy': hrName,
           'lastAdjustedAt': FieldValue.serverTimestamp(),
@@ -2664,7 +2703,14 @@ class _HRDelegateAttendanceDetailScreenState
     final status = HrStatusColors.of(context);
     final isWeb = WebRuntimePolicy.isWeb;
 
-    if (isWeb && s.isAutoCheckOut) {
+    if (s.isMissingCheckOut) {
+      // TAS-362: zero hours until HR sets the check-out (warning, not error).
+      bgColor = status.warningContainer;
+      borderColor = status.warning.withValues(alpha: 0.5);
+      textColor = status.onWarningContainer;
+      icon = Icons.schedule_rounded;
+      label = 'انصراف مش متسجل (صفر ساعات)';
+    } else if (isWeb && s.isAutoCheckOut) {
       // Web, approved status colors: auto check-out = warning.
       bgColor = status.warningContainer;
       borderColor = status.warning.withValues(alpha: 0.5);

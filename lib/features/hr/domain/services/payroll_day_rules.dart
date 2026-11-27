@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
+import 'package:delegate_app/features/attendance/domain/missing_check_out_rule.dart';
 
 /// قواعد احتساب يوم العمل في مسير الرواتب.
 ///
@@ -16,18 +17,41 @@ class PayrollDayRules {
       shiftHours <= 0 ? 0 : (shiftHours * 60).round();
 
   /// الدقائق المدفوعة ليوم واحد.
+  ///
+  /// TAS-362: من تاريخ بداية القاعدة ([MissingCheckOutRule])، الجلسة المنسية
+  /// (من غير انصراف بعد 11.5 ساعة، أو معلّمة `missingCheckOut`/`isAutoCheckOut`)
+  /// بتتحسب صفر لحد ما الـ HR يسجل الانصراف بإيده. قبل التاريخ ده الحساب
+  /// القديم (وردية كاملة) زي ما هو.
   static int paidMinutesForDay({
     required DateTime checkIn,
     DateTime? checkOut,
     required DateTime now,
     required double shiftHours,
+    bool forgottenFlag = false,
+    bool manuallyAdjusted = false,
+    DateTime? missingCheckOutRuleFrom,
   }) {
+    if (MissingCheckOutRule.isUnpaid(
+      checkIn: checkIn,
+      checkOut: checkOut,
+      flagged: forgottenFlag,
+      manuallyAdjusted: manuallyAdjusted,
+      now: now,
+      ruleFrom: missingCheckOutRuleFrom,
+    )) {
+      return 0;
+    }
     final cap = shiftMinutes(shiftHours);
     if (checkOut != null) {
       final worked = checkOut.difference(checkIn).inMinutes;
       if (worked <= 0) return 0;
       return worked < cap ? worked : cap;
     }
+    // TAS-362: under the new rule a session with no check-out is either still
+    // running or forgotten; neither is paid yet (no «past day» shortcut, so a
+    // shift crossing midnight is not cut at 00:00).
+    final ruleStart = missingCheckOutRuleFrom ?? MissingCheckOutRule.from;
+    if (ruleStart != null && !checkIn.isBefore(ruleStart)) return 0;
     final isPastDay = checkIn.isBefore(DateTime(now.year, now.month, now.day));
     final isAutoClosed = now.difference(checkIn) >= kAttendanceAutoCloseAfter;
     return (isPastDay || isAutoClosed) ? cap : 0;

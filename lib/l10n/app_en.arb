@@ -341,6 +341,7 @@
     }
   },
   "inProgress": "In progress...",
+  "missingCheckOut": "Check-out not recorded",
   "@inProgress": {
     "description": "Ongoing session indicator"
   },
