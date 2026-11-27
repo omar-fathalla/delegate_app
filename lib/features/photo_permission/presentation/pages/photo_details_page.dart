@@ -210,7 +210,14 @@ class _PhotoDetailsPageState extends State<PhotoDetailsPage> {
         child: Scaffold(
           key: const Key('photo_details_immersive'),
           backgroundColor: cs.scrim,
-          body: SafeArea(child: _pager(fill: true)),
+          body: SafeArea(
+            child: Stack(
+              children: [
+                Positioned.fill(child: _pager(fill: true)),
+                if (widget.photos.length > 1) ..._arrows(l10n),
+              ],
+            ),
+          ),
         ),
       );
     }
@@ -287,36 +294,7 @@ class _PhotoDetailsPageState extends State<PhotoDetailsPage> {
                     child: Stack(
                       children: [
                         Positioned.fill(child: _pager(fill: true)),
-                        if (widget.photos.length > 1) ...[
-                          PositionedDirectional(
-                            start: TashilSpacing.sm,
-                            top: 0,
-                            bottom: 0,
-                            child: Center(
-                              child: IconButton.filledTonal(
-                                key: const Key('photo_details_previous'),
-                                tooltip: l10n.photoPrevious,
-                                icon: const Icon(Symbols.chevron_left_rounded),
-                                onPressed: _index > 0 ? () => _go(-1) : null,
-                              ),
-                            ),
-                          ),
-                          PositionedDirectional(
-                            end: TashilSpacing.sm,
-                            top: 0,
-                            bottom: 0,
-                            child: Center(
-                              child: IconButton.filledTonal(
-                                key: const Key('photo_details_next'),
-                                tooltip: l10n.photoNext,
-                                icon: const Icon(Symbols.chevron_right_rounded),
-                                onPressed: _index < widget.photos.length - 1
-                                    ? () => _go(1)
-                                    : null,
-                              ),
-                            ),
-                          ),
-                        ],
+                        if (widget.photos.length > 1) ..._arrows(l10n),
                       ],
                     ),
                   ),
@@ -341,11 +319,42 @@ class _PhotoDetailsPageState extends State<PhotoDetailsPage> {
 
   /// The swipeable photos. [fill]: the photo alone fills the space
   /// (immersive, wide); otherwise each page is the photo and its details.
+  /// Previous / next over the photo (full view and wide windows, where a
+  /// swipe on the photo is not used).
+  List<Widget> _arrows(AppLocalizations l10n) => [
+    PositionedDirectional(
+      start: TashilSpacing.sm,
+      top: 0,
+      bottom: 0,
+      child: Center(
+        child: IconButton.filledTonal(
+          key: const Key('photo_details_previous'),
+          tooltip: l10n.photoPrevious,
+          icon: const Icon(Symbols.chevron_left_rounded),
+          onPressed: _index > 0 ? () => _go(-1) : null,
+        ),
+      ),
+    ),
+    PositionedDirectional(
+      end: TashilSpacing.sm,
+      top: 0,
+      bottom: 0,
+      child: Center(
+        child: IconButton.filledTonal(
+          key: const Key('photo_details_next'),
+          tooltip: l10n.photoNext,
+          icon: const Icon(Symbols.chevron_right_rounded),
+          onPressed: _index < widget.photos.length - 1 ? () => _go(1) : null,
+        ),
+      ),
+    ),
+  ];
+
   Widget _pager({required bool fill}) {
     return PageView.builder(
       key: const Key('photo_details_pager'),
       controller: _pages,
-      physics: _zoomed
+      physics: _zoomed || fill
           ? const NeverScrollableScrollPhysics()
           : const PageScrollPhysics(),
       itemCount: widget.photos.length,
@@ -362,7 +371,7 @@ class _PhotoDetailsPageState extends State<PhotoDetailsPage> {
             BranchDisplayCache.instance.displayName(p.branchName),
             _fullTime(p.capturedAt),
           ),
-          showHint: i == widget.initialIndex && !PhotoDetailsPage._hintShown,
+          showHint: fill && i == _index && !PhotoDetailsPage._hintShown,
           onHintShown: () => PhotoDetailsPage._hintShown = true,
           onTap: () => _setImmersive(!_immersive),
           onZoomChanged: (z) {
@@ -567,6 +576,11 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
   Offset _tapAt = Offset.zero;
   int _retry = 0;
 
+  /// Panning inside the photo only while zoomed; otherwise a horizontal
+  /// drag on the photo belongs to the PageView (found on the M31: swiping
+  /// over the photo did not change pages).
+  bool _zoomedIn = false;
+
   @override
   void initState() {
     super.initState();
@@ -585,8 +599,11 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
     super.dispose();
   }
 
-  void _report() =>
-      widget.onZoomChanged(_zoom.value.getMaxScaleOnAxis() > 1.01);
+  void _report() {
+    final z = _zoom.value.getMaxScaleOnAxis() > 1.01;
+    if (z != _zoomedIn) setState(() => _zoomedIn = z);
+    widget.onZoomChanged(z);
+  }
 
   void _doubleTap() {
     if (_zoom.value.getMaxScaleOnAxis() > 1.01) {
@@ -604,6 +621,25 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final image = Center(
+      child: AppPhotoImage(
+        key: ValueKey('photo_${widget.photo.uid}_$_retry'),
+        photoUrl: widget.photo.photoUrl,
+        fit: BoxFit.contain,
+        errorWidget: SingleChildScrollView(
+          child: EmptyState(
+            key: const Key('photo_details_load_failed'),
+            icon: Symbols.broken_image_rounded,
+            title: l10n.photoLoadFailed,
+            action: FilledButton.tonalIcon(
+              onPressed: () => setState(() => _retry++),
+              icon: const Icon(Symbols.refresh_rounded),
+              label: Text(l10n.retry),
+            ),
+          ),
+        ),
+      ),
+    );
     return Tooltip(
       key: _hint,
       message: l10n.pinchToZoom,
@@ -613,37 +649,26 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
         label: widget.semanticLabel,
         child: GestureDetector(
           onTap: widget.onTap,
-          onDoubleTapDown: (d) => _tapAt = d.localPosition,
-          onDoubleTap: _doubleTap,
+          onDoubleTapDown: widget.fill ? (d) => _tapAt = d.localPosition : null,
+          onDoubleTap: widget.fill ? _doubleTap : null,
           child: ColoredBox(
             color: widget.fill
                 ? Colors.transparent
                 : cs.surfaceContainerHighest,
-            child: InteractiveViewer(
-              transformationController: _zoom,
-              minScale: 1,
-              maxScale: 4,
-              onInteractionEnd: (_) => _report(),
-              child: Center(
-                child: AppPhotoImage(
-                  key: ValueKey('photo_${widget.photo.uid}_$_retry'),
-                  photoUrl: widget.photo.photoUrl,
-                  fit: BoxFit.contain,
-                  errorWidget: SingleChildScrollView(
-                    child: EmptyState(
-                      key: const Key('photo_details_load_failed'),
-                      icon: Symbols.broken_image_rounded,
-                      title: l10n.photoLoadFailed,
-                      action: FilledButton.tonalIcon(
-                        onPressed: () => setState(() => _retry++),
-                        icon: const Icon(Symbols.refresh_rounded),
-                        label: Text(l10n.retry),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            // Zoom only in the full view. InteractiveViewer adds a scale
+            // recognizer even with scaling off, and over the photo it took
+            // the horizontal swipe from the PageView (M31, 27 Nov), so on the
+            // details page the photo is plain and a tap opens the full view.
+            child: widget.fill
+                ? InteractiveViewer(
+                    transformationController: _zoom,
+                    minScale: 1,
+                    maxScale: 4,
+                    panEnabled: _zoomedIn,
+                    onInteractionEnd: (_) => _report(),
+                    child: image,
+                  )
+                : image,
           ),
         ),
       ),

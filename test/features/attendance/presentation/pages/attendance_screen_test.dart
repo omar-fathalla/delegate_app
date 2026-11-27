@@ -422,6 +422,11 @@ void main() {
   testWidgets(
     'AttendanceScreen preserves cross-chain records after SyncRequested reload cycle',
     (WidgetTester tester) async {
+      // TAS-387: the chain and branch menus are stacked now, so the list
+      // starts lower; a tall view keeps every session built.
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final now = DateTime.now();
       mockAttendanceRepository.mockPaginatedItems = [
         Attendance(

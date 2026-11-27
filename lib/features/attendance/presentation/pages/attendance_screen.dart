@@ -1399,9 +1399,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       padding: const EdgeInsetsDirectional.symmetric(
         vertical: TashilSpacing.sm,
       ),
-      child: Row(
+      // TAS-387: chain above branch, each across the width. Side by side
+      // they were half wide and «كل السلاسل · 1» was cut (M31, 27 Nov).
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
+          SizedBox(
             child: DropdownMenu<String>(
               key: const Key('attendance_chain_menu'),
               initialSelection: _chainFilter,
@@ -1432,8 +1435,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               },
             ),
           ),
-          const SizedBox(width: TashilSpacing.sm),
-          Expanded(
+          const SizedBox(height: TashilSpacing.sm),
+          SizedBox(
             child: DropdownMenu<String>(
               key: ValueKey('attendance_branch_menu_$_chainFilter'),
               initialSelection: _branchFilter,
