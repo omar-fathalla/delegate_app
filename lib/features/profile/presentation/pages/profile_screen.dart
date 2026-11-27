@@ -1128,7 +1128,13 @@ class _ProfileBody extends StatelessWidget {
         );
         if (context.mounted) {
           Navigator.pop(context);
-          AppSnackBar.showSuccess(context, 'تم تحديث ${item.title} وسيُراجع من الإدارة.');
+          // TAS-373: only a new ID card stops the delegate until review.
+          AppSnackBar.showSuccess(
+            context,
+            supervisorReuploadSendsDelegateToReview(item.docType)
+                ? 'تم تحديث ${item.title}. المندوب هيقف لحد ما الإدارة تراجع البطاقة.'
+                : 'تم تحديث ${item.title} وهيتراجع من الإدارة، والمندوب يفضل شغال.',
+          );
           context.read<ProfileBloc>().add(
             LoadProfile(
               uid: delegate.uid,

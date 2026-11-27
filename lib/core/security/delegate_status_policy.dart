@@ -3,8 +3,10 @@ library;
 
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
-/// Company supervisor ([UserRole.admin] without company-admin approver path) may
-/// set an active delegate to `pending` only together with a doc re-upload write.
+/// Company supervisor ([UserRole.admin] without company-admin approver path)
+/// replaces an active delegate's document through the server callable
+/// `supervisorReuploadDelegateDocument`. Since TAS-373 only an ID card sends
+/// the delegate back to review ([supervisorReuploadSendsDelegateToReview]).
 bool shouldSupervisorMarkDelegatePendingOnDocReplace({
   required Delegate target,
   required UserRole? viewerRole,
@@ -19,6 +21,12 @@ bool shouldSupervisorMarkDelegatePendingOnDocReplace({
   final company = (viewerCompanyUID ?? '').trim();
   return company.isNotEmpty && company == target.companyUID;
 }
+
+/// TAS-373 (user decision 2026-11-27): a new ID card (front or back) sends
+/// the delegate back to `pending` until an admin approves it; a new personal
+/// photo or payment receipt keeps the delegate `active`.
+bool supervisorReuploadSendsDelegateToReview(String docType) =>
+    docType == 'nationalIdFront' || docType == 'nationalIdBack';
 
 /// Only global roles may change status away from suspended (rules mirror).
 bool canClientLiftSuspendedDelegateStatus(UserRole? role) {
