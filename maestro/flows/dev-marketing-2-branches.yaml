@@ -1,0 +1,126 @@
+appId: com.tashil.delegate.dev
+---
+# TAS-393 marketing journey 2/5: branches tab. Data: today's check-ins on
+# Fake Branch Alpha (seed-marketing-journey-data.js).
+- runFlow:
+    file: ../subflows/login-marketing.yaml
+
+- tapOn: "الفروع(\\n.*)?"
+- runFlow:
+    when:
+      visible: "ابحث عن فرع.*"
+    commands:
+      - tapOn: "Fake Branch Alpha"
+- extendedWaitUntil:
+    visible: "Fake Branch Alpha(\\n.*)*"
+    timeout: 60000
+- extendedWaitUntil:
+    visible: "المرور على المناديب"
+    timeout: 60000
+
+# Filters.
+- tapOn: "لم ينصرف.*"
+- tapOn: "المتبقي للمرور.*"
+- tapOn: "الكل.*"
+
+# Search by delegate name, then clear.
+- tapOn: "ابحث باسم المندوب أو الشركة"
+- inputText: "beta 1"
+- extendedWaitUntil:
+    visible: ".*Fake Delegate beta 1.*"
+    timeout: 15000
+- assertNotVisible: ".*Fake Delegate alpha 1.*"
+- tapOn: "مسح البحث"
+- hideKeyboard
+
+# Floor status sheet (long press): mark missing, then reset.
+- longPressOn: "فحص"
+- extendedWaitUntil:
+    visible: "تحديد حالة التواجد بالصالة"
+    timeout: 15000
+- tapOn: "غير متواجد بالصالة.*"
+- extendedWaitUntil:
+    visible: "غير متواجد"
+    timeout: 15000
+- hideKeyboard
+- longPressOn: "غير متواجد"
+- extendedWaitUntil:
+    visible: "إعادة تعيين.*"
+    timeout: 15000
+- tapOn: "إعادة تعيين.*"
+- assertNotVisible: "غير متواجد"
+
+# Call the delegate's supervisor: the sheet, copy the number, close.
+- hideKeyboard
+- tapOn: "اتصال بمشرف المندوب"
+- extendedWaitUntil:
+    visible: "الاتصال بمشرف المندوب|لا يوجد رقم هاتف مسجل لمشرف هذا المندوب"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "نسخ الرقم"
+    commands:
+      - tapOn: "نسخ الرقم"
+- runFlow:
+    when:
+      visible: "إغلاق"
+    commands:
+      - tapOn: "إغلاق"
+
+# Delegate row opens the read-only attendance history.
+- hideKeyboard
+- tapOn: ".*Fake Delegate beta 2.*"
+- extendedWaitUntil:
+    visible: ".*الحضور.*"
+    timeout: 30000
+- tapOn: "رجوع|Back"
+- extendedWaitUntil:
+    visible: "المرور على المناديب"
+    timeout: 30000
+
+# Branch menu: Excel export modal (cancel here; the share sheet is Patrol's).
+- hideKeyboard
+- tapOn: "خيارات الفرع"
+- tapOn: "تصدير كشف الفرع \\(Excel\\)"
+- extendedWaitUntil:
+    visible: "تصدير كشف الحضور إلى Excel"
+    timeout: 15000
+- assertVisible: "كشف الحضور الكامل \\(الكل\\)(\\n.*)*"
+- tapOn: "إلغاء"
+
+# Date: pick another day in the picker, then «اليوم» brings today back.
+- hideKeyboard
+- tapOn: ".*نوفمبر|.*ديسمبر|.*يناير|.*فبراير|.*مارس|.*أبريل|.*مايو|.*يونيو|.*يوليو|.*أغسطس|.*سبتمبر|.*أكتوبر"
+- extendedWaitUntil:
+    visible: "حسنًا|OK"
+    timeout: 15000
+- tapOn: "1, .*"
+- tapOn: "حسنًا|OK"
+- extendedWaitUntil:
+    visible: "اليوم"
+    timeout: 30000
+- tapOn: "اليوم"
+- extendedWaitUntil:
+    notVisible: "اليوم"
+    timeout: 30000
+
+# Remove the branch, then add it back.
+- hideKeyboard
+- tapOn: "خيارات الفرع"
+- tapOn: "إزالة الفرع من القائمة"
+- extendedWaitUntil:
+    visible: "حذف الفرع"
+    timeout: 15000
+- tapOn: "حذف"
+- extendedWaitUntil:
+    visible: "لم تضف أي فرع بعد|ابحث عن فرع.*"
+    timeout: 30000
+- runFlow:
+    when:
+      notVisible: "ابحث عن فرع.*"
+    commands:
+      - tapOn: "إضافة فرع(\\n.*)?"
+- tapOn: "Fake Branch Alpha"
+- extendedWaitUntil:
+    visible: "Fake Branch Alpha(\\n.*)*"
+    timeout: 60000
