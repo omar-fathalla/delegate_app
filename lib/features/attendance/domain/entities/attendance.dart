@@ -1,4 +1,5 @@
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
+import 'package:delegate_app/features/attendance/domain/missing_check_out_rule.dart';
 import 'package:equatable/equatable.dart';
 
 class Attendance extends Equatable {
@@ -44,15 +45,26 @@ class Attendance extends Equatable {
       (checkOutTime == null &&
           DateTime.now().difference(checkInTime) >= kAttendanceAutoCloseAfter);
 
+  /// TAS-362: جلسة منسية (من تاريخ بداية القاعدة): ساعاتها صفر لحد ما الـ HR
+  /// يسجل الانصراف. الانصراف الأوتوماتيك (من التطبيق القديم أو السيرفر)
+  /// بيتعامل نفس المعاملة.
+  bool get isMissingCheckOut => MissingCheckOutRule.isUnpaid(
+        checkIn: checkInTime,
+        checkOut: isAutoCheckOut ? null : checkOutTime,
+        flagged: isAutoCheckOut,
+        now: DateTime.now(),
+      );
+
   /// وقت الانصراف الفعلي: الانصراف المسجل يدوياً، أو بعد 11.5 ساعة من الحضور إذا أغلقت تلقائياً
-  DateTime? get effectiveCheckOutTime =>
-      checkOutTime ??
-      (isEffectiveAutoCheckOut
-          ? checkInTime.add(kAttendanceAutoCloseAfter)
-          : null);
+  DateTime? get effectiveCheckOutTime {
+    if (isMissingCheckOut) return null;
+    return checkOutTime ??
+        (isEffectiveAutoCheckOut ? checkInTime.add(kAttendanceAutoCloseAfter) : null);
+  }
 
   /// ما إذا كانت الجلسة نشطة حالياً (حاضر الآن ولم تنته وردية الـ 11.5 ساعة بعد)
-  bool get isActive => checkOutTime == null && !isEffectiveAutoCheckOut;
+  bool get isActive =>
+      checkOutTime == null && !isEffectiveAutoCheckOut && !isMissingCheckOut;
 
   @override
   List<Object?> get props => [

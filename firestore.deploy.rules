@@ -2596,6 +2596,10 @@ match /system_config/session_control {
 allow read: if knownIdentity();
 allow write: if isSuperAdmin();
 }
+match /system_config/attendance_rules {
+allow read: if knownIdentity();
+allow write: if isSuperAdmin();
+}
 match /config/subscriptions {
 allow read: if knownIdentity();
 allow write: if false;

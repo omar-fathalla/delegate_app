@@ -3955,6 +3955,14 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    // TAS-362: start date of the «forgotten session = zero hours» rule
+    // (missingCheckOutRuleFrom). Payroll and attendance screens read it;
+    // only a super admin sets it (no date = the old full-shift rule).
+    match /system_config/attendance_rules {
+      allow read: if knownIdentity();
+      allow write: if isSuperAdmin();
+    }
+
     match /config/subscriptions {
       allow read: if knownIdentity();
       allow write: if false;

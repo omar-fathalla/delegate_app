@@ -7,6 +7,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {FieldValue} from "firebase-admin/firestore";
+import {idReviewRestoresActive} from "./supervisor_delegate_doc_reupload_logic";
 import {
   applyPrivilegedDocumentReview,
   decidePrivilegedDocReupload,
@@ -155,9 +156,13 @@ export const privilegedReuploadDelegateDocument = functions
         const code = review.reason === "not_found" ? "not-found" : "failed-precondition";
         throw new functions.https.HttpsError(code, reviewMsg);
       }
+      // TAS-373: approving the ID card a supervisor replaced restores the
+      // delegate; a rejection leaves it pending with its reason.
+      const restore = approve && idReviewRestoresActive(delegateData, review.documents);
       const batch = db.batch();
       batch.update(delegateRef, {
         documents: review.documents,
+        ...(restore ? {status: "active", statusReason: FieldValue.delete()} : {}),
         updatedAt: FieldValue.serverTimestamp(),
       });
       const reqRef = db.collection("delegate_requests").doc(delegateUid);
@@ -179,7 +184,11 @@ export const privilegedReuploadDelegateDocument = functions
         }
       }
       await batch.commit();
-      return {ok: true, documentStatus: approve ? "approved" : "rejected"};
+      return {
+        ok: true,
+        documentStatus: approve ? "approved" : "rejected",
+        ...(restore ? {delegateStatus: "active"} : {}),
+      };
     }
 
     const defaultBucket = admin.storage().bucket().name;

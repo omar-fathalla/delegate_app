@@ -530,6 +530,12 @@ abstract class AppLocalizations {
   /// **'In progress...'**
   String get inProgress;
 
+  /// No description provided for @missingCheckOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-out not recorded'**
+  String get missingCheckOut;
+
   /// Full name label
   ///
   /// In en, this message translates to:
