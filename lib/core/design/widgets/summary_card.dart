@@ -47,6 +47,7 @@ class SummaryCard extends StatelessWidget {
     this.trailingMuted = false,
     this.facts = const [],
     this.onTap,
+    this.action,
     this.margin = const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
   });
 
@@ -67,6 +68,10 @@ class SummaryCard extends StatelessWidget {
 
   final List<SummaryFact> facts;
   final VoidCallback? onTap;
+
+  /// Optional item menu at the very end of the header (C-24 `MenuAnchor`
+  /// with an `IconButton`), for actions on the record.
+  final Widget? action;
   final EdgeInsetsGeometry margin;
 
   @override
@@ -143,6 +148,7 @@ class SummaryCard extends StatelessWidget {
             ],
           ),
         ],
+        ?action,
       ],
     );
 

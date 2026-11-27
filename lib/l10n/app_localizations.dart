@@ -2780,6 +2780,42 @@ abstract class AppLocalizations {
   /// **'Info'**
   String get notifKindInfo;
 
+  /// No description provided for @reqRejectReasonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for rejection'**
+  String get reqRejectReasonTitle;
+
+  /// No description provided for @reqDecidedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Decided by'**
+  String get reqDecidedBy;
+
+  /// No description provided for @reqHoursWord.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{hour} other{hours}}'**
+  String reqHoursWord(int count);
+
+  /// No description provided for @reqDaysWord.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{day} other{days}}'**
+  String reqDaysWord(int count);
+
+  /// No description provided for @reqDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get reqDurationLabel;
+
+  /// No description provided for @reqFilterPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get reqFilterPending;
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

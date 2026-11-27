@@ -1474,6 +1474,44 @@ class AppLocalizationsAr extends AppLocalizations {
   String get notifKindInfo => 'معلومة';
 
   @override
+  String get reqRejectReasonTitle => 'سبب الرفض';
+
+  @override
+  String get reqDecidedBy => 'الرد من';
+
+  @override
+  String reqHoursWord(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ساعة',
+      few: 'ساعات',
+      two: 'ساعتين',
+      one: 'ساعة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reqDaysWord(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'يوم',
+      few: 'أيام',
+      two: 'يومين',
+      one: 'يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reqDurationLabel => 'المدة';
+
+  @override
+  String get reqFilterPending => 'معلّق';
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override

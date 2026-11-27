@@ -1474,6 +1474,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notifKindInfo => 'Info';
 
   @override
+  String get reqRejectReasonTitle => 'Reason for rejection';
+
+  @override
+  String get reqDecidedBy => 'Decided by';
+
+  @override
+  String reqHoursWord(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'hours',
+      one: 'hour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reqDaysWord(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'days',
+      one: 'day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reqDurationLabel => 'Duration';
+
+  @override
+  String get reqFilterPending => 'Pending';
+
+  @override
   String get allChains => 'All chains';
 
   @override
