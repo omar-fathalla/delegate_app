@@ -96,12 +96,10 @@ class _NotificationListItemState extends State<NotificationListItem> {
     final cleanTitle = NotificationModel.sanitizeText(widget.notification.title);
     final cleanBody = NotificationModel.sanitizeText(widget.notification.body);
     final rawSenderName = widget.notification.senderName?.trim();
-    final rawSenderRole = widget.notification.senderRole?.trim();
 
     final displaySenderName = (rawSenderName != null && rawSenderName.isNotEmpty)
         ? NotificationModel.sanitizeText(rawSenderName)
         : l10n.systemAdministration;
-    final displaySenderRoleArabic = NotificationModel.formatSenderRoleArabic(rawSenderRole);
 
     final isTask = widget.notification.type == 'task' &&
         widget.notification.taskId != null;
@@ -109,6 +107,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
         widget.notification.title.contains('تحديث') ||
         widget.notification.body.contains('تحديث التطبيق');
 
+    final kind = _kindOf(context, widget.notification.type, l10n);
     // TAS-356: one Card.filled per notification, the type icon on primary +
     // onPrimary (TAS-384 rule), text from the textTheme; unread = dot and a
     // stronger title, no tinted borders.
@@ -165,15 +164,19 @@ class _NotificationListItemState extends State<NotificationListItem> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Notifications colour rule (user decision 27 Nov,
+                    // TAS-387): each kind gets its own role pair so the list
+                    // reads at a glance; still roles, never hex.
                     Container(
+                      key: const Key('notificationTypeIcon'),
                       padding: const EdgeInsets.all(TashilSpacing.sm),
                       decoration: BoxDecoration(
-                        color: colorScheme.primary,
+                        color: kind.fill,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         _getIcon(widget.notification.type),
-                        color: colorScheme.onPrimary,
+                        color: kind.onFill,
                         size: 20,
                       ),
                     ),
@@ -202,49 +205,72 @@ class _NotificationListItemState extends State<NotificationListItem> {
                                     start: TashilSpacing.sm,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: colorScheme.primary,
+                                    color: kind.fill,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
                             ],
                           ),
-                          const SizedBox(height: TashilSpacing.xs / 2),
-                          Text(
-                            _formatDateTime(widget.notification.createdAt),
-                            style: tt.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                          const SizedBox(height: TashilSpacing.xs),
+                          Wrap(
+                            spacing: TashilSpacing.sm,
+                            runSpacing: TashilSpacing.xs,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Container(
+                                key: const Key('notificationKindLabel'),
+                                padding: const EdgeInsetsDirectional.symmetric(
+                                  horizontal: TashilSpacing.sm,
+                                  vertical: TashilSpacing.xs / 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: kind.container,
+                                  borderRadius: BorderRadius.circular(
+                                    TashilRadius.small,
+                                  ),
+                                ),
+                                child: Text(
+                                  kind.label,
+                                  style: tt.labelSmall?.copyWith(
+                                    color: kind.onContainer,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '$displaySenderName · ${_formatDateTime(widget.notification.createdAt)}',
+                                style: tt.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_rounded),
-                      tooltip: l10n.deleteNotification,
-                      onPressed: _confirmDelete,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: TashilSpacing.sm),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.person_pin_rounded,
-                      size: 16,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: TashilSpacing.xs),
-                    Flexible(
-                      child: Text(
-                        l10n.senderLine(
-                          displaySenderName,
-                          _localizedSenderRole(displaySenderRoleArabic, l10n),
-                        ),
-                        style: tt.labelMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                    // Actions on the item in a menu (C-24), not a trash
+                    // button on every card; swipe still deletes.
+                    MenuAnchor(
+                      builder: (context, controller, _) => IconButton(
+                        key: const Key('notificationMenuButton'),
+                        icon: const Icon(Icons.more_vert_rounded),
+                        tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+                        onPressed: () => controller.isOpen
+                            ? controller.close()
+                            : controller.open(),
                       ),
+                      menuChildren: [
+                        if (isUnread)
+                          MenuItemButton(
+                            leadingIcon: const Icon(Icons.done_rounded),
+                            onPressed: _markAsRead,
+                            child: Text(l10n.markAsRead),
+                          ),
+                        MenuItemButton(
+                          leadingIcon: const Icon(Icons.delete_outline_rounded),
+                          onPressed: _confirmDelete,
+                          child: Text(l10n.deleteNotification),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -271,12 +297,6 @@ class _NotificationListItemState extends State<NotificationListItem> {
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      if (isUnread)
-                        TextButton.icon(
-                          onPressed: _markAsRead,
-                          icon: const Icon(Icons.done_rounded),
-                          label: Text(l10n.markAsRead),
-                        ),
                       if (isTask)
                         FilledButton.tonalIcon(
                           onPressed: () {
@@ -334,6 +354,19 @@ class _NotificationListItemState extends State<NotificationListItem> {
         return Icons.event_available_rounded;
       case 'subscription_rejected':
         return Icons.person_off_rounded;
+      case 'leave_approved':
+        return Icons.event_available_rounded;
+      case 'leave_rejected':
+        return Icons.event_busy_rounded;
+      case 'attendance_adjusted':
+        return Icons.edit_calendar_rounded;
+      case 'device_unbound':
+        return Icons.phonelink_erase_rounded;
+      case 'device_unbind_rejected':
+        return Icons.phonelink_lock_rounded;
+      case 'geofence_violation':
+      case 'security_violation':
+        return Icons.wrong_location_rounded;
       case 'task':
         return Icons.task_alt_rounded;
       case 'support_alert':
@@ -352,8 +385,10 @@ class _NotificationListItemState extends State<NotificationListItem> {
     }
   }
 
+  // TAS-387: date and time in the app language (ص / م in Arabic).
   String _formatDateTime(DateTime dateTime) {
-    return DateFormat('dd/MM/yyyy • hh:mm a').format(dateTime);
+    final locale = Localizations.localeOf(context).languageCode;
+    return DateFormat('d MMMM • h:mm a', locale).format(dateTime);
   }
 
   String _formatTimeAgo(DateTime dateTime) {
@@ -374,29 +409,67 @@ class _NotificationListItemState extends State<NotificationListItem> {
   }
 }
 
-/// Maps the Arabic sender role from [NotificationModel.formatSenderRoleArabic]
-/// to the active locale. Unknown values are shown as-is (raw data).
-String _localizedSenderRole(String arabicRole, AppLocalizations l10n) {
-  switch (arabicRole) {
-    case 'النظام':
-      return l10n.senderRoleSystem;
-    case 'مشرف الشركة':
-      return l10n.senderRoleCompanySupervisor;
-    case 'سوبر أدمن':
-      return l10n.roleSuperAdmin;
-    case 'مسؤول المنظمة':
-      return l10n.senderRoleOrgAdmin;
-    case 'مسؤول تسويق الفروع':
-      return l10n.senderRoleBranchesMarketing;
-    case 'مسؤول تسويق العروض':
-      return l10n.senderRolePromotionMarketing;
-    case 'مسؤول التسويق':
-      return l10n.senderRoleMarketing;
-    case 'الدعم الفني':
-      return l10n.senderRoleTechSupport;
-    case 'مروج':
-    case 'مندوب':
-      return l10n.roleDelegate;
+/// The colour family of a notification kind (TAS-387, user decision
+/// 2026-11-27): each family is a role pair, so kinds stay apart at a glance
+/// in both themes and under the user's seed colour.
+class _Kind {
+  const _Kind(this.fill, this.onFill, this.container, this.onContainer, this.label);
+  final Color fill;
+  final Color onFill;
+  final Color container;
+  final Color onContainer;
+  final String label;
+}
+
+_Kind _kindOf(BuildContext context, String type, AppLocalizations l10n) {
+  final cs = Theme.of(context).colorScheme;
+  final sem = Theme.of(context).extension<TashilSemanticColors>();
+  switch (type) {
+    // Needs attention: something against the delegate or refused.
+    case 'penalty':
+    case 'leave_rejected':
+    case 'subscription_rejected':
+    case 'device_unbind_rejected':
+    case 'geofence_violation':
+    case 'security_violation':
+      return _Kind(cs.error, cs.onError, cs.errorContainer,
+          cs.onErrorContainer, l10n.notifKindAttention);
+    // Done in the delegate's favour.
+    case 'leave_approved':
+    case 'subscription_approved':
+    case 'wallet_payout':
+    case 'wallet_allocation':
+    case 'device_unbound':
+      return _Kind(
+        sem?.success ?? cs.primary,
+        sem?.onSuccess ?? cs.onPrimary,
+        sem?.successContainer ?? cs.primaryContainer,
+        sem?.onSuccessContainer ?? cs.onPrimaryContainer,
+        l10n.notifKindDone,
+      );
+    // A change the delegate should know about.
+    case 'attendance_adjusted':
+    case 'subscription_renewal_reminder':
+      return _Kind(
+        sem?.warning ?? cs.tertiary,
+        sem?.onWarning ?? cs.onTertiary,
+        sem?.warningContainer ?? cs.tertiaryContainer,
+        sem?.onWarningContainer ?? cs.onTertiaryContainer,
+        l10n.notifKindChange,
+      );
+    // Work for the delegate.
+    case 'task':
+    case 'photo_permission':
+    case 'permission':
+      return _Kind(cs.primary, cs.onPrimary, cs.primaryContainer,
+          cs.onPrimaryContainer, l10n.notifKindWork);
+    case 'attendance_check_in':
+    case 'attendance_check_out':
+      return _Kind(cs.secondary, cs.onSecondary, cs.secondaryContainer,
+          cs.onSecondaryContainer, l10n.notifKindAttendance);
+    // News: announcements, updates, support.
+    default:
+      return _Kind(cs.tertiary, cs.onTertiary, cs.tertiaryContainer,
+          cs.onTertiaryContainer, l10n.notifKindInfo);
   }
-  return arabicRole;
 }

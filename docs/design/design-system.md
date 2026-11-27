@@ -107,6 +107,15 @@ contrast button in the app bar cycles the three levels).
   `errorContainer` mark real errors and a state that blocks the person's
   next action (outside the attendance zone blocks check-in). Values that
   only inform (absence days, penalty totals) stay neutral.
+- **Notification kinds (user decision 2026-11-27, TAS-387):** each kind of
+  notification has its own colour family so the list reads at a glance:
+  needs attention (penalty, refused) `error`; done (approved, paid)
+  `success`; a change (attendance edited, reminder) `warning`; work (task,
+  photo permission) `primary`; attendance `secondary`; news (update,
+  announcement, support) `tertiary`. The type icon sits on the family's
+  strong colour with its `on` colour, and a small label in the family's
+  container names it. This is the one place card icons are not all
+  `primary`.
 - **Read-only labels are not chips:** a value the user cannot act on (the
   active organization next to the role, a status) is an icon + text label,
   never a chip, border, glow or pulsing animation.

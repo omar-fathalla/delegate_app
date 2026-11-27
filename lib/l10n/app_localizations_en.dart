@@ -1456,6 +1456,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get attCheckOutLabel => 'Check-out';
 
   @override
+  String get notifKindAttention => 'Needs attention';
+
+  @override
+  String get notifKindDone => 'Done';
+
+  @override
+  String get notifKindChange => 'Change';
+
+  @override
+  String get notifKindWork => 'To do';
+
+  @override
+  String get notifKindAttendance => 'Attendance';
+
+  @override
+  String get notifKindInfo => 'Info';
+
+  @override
   String get allChains => 'All chains';
 
   @override

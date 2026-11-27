@@ -1559,6 +1559,12 @@
   "attDurationLabel": "Duration",
   "attCheckInLabel": "Check-in",
   "attCheckOutLabel": "Check-out",
+  "notifKindAttention": "Needs attention",
+  "notifKindDone": "Done",
+  "notifKindChange": "Change",
+  "notifKindWork": "To do",
+  "notifKindAttendance": "Attendance",
+  "notifKindInfo": "Info",
   "allChains": "All chains",
   "attNoSessionsInChain": "No attendance records for {chain} this month",
   "@attNoSessionsInChain": {

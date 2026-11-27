@@ -2744,6 +2744,42 @@ abstract class AppLocalizations {
   /// **'Check-out'**
   String get attCheckOutLabel;
 
+  /// No description provided for @notifKindAttention.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs attention'**
+  String get notifKindAttention;
+
+  /// No description provided for @notifKindDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get notifKindDone;
+
+  /// No description provided for @notifKindChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get notifKindChange;
+
+  /// No description provided for @notifKindWork.
+  ///
+  /// In en, this message translates to:
+  /// **'To do'**
+  String get notifKindWork;
+
+  /// No description provided for @notifKindAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance'**
+  String get notifKindAttendance;
+
+  /// No description provided for @notifKindInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get notifKindInfo;
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

@@ -1456,6 +1456,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get attCheckOutLabel => 'الخروج';
 
   @override
+  String get notifKindAttention => 'محتاج انتباهك';
+
+  @override
+  String get notifKindDone => 'تم';
+
+  @override
+  String get notifKindChange => 'تغيير';
+
+  @override
+  String get notifKindWork => 'مطلوب منك';
+
+  @override
+  String get notifKindAttendance => 'حضور';
+
+  @override
+  String get notifKindInfo => 'معلومة';
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override
