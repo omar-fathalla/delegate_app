@@ -11,8 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// Counted in `lib/` outside `lib/core/design/` (the design system itself),
 /// `lib/features/playground/` (dev-only demos: the content-colour demo needs
 /// fixed sample image colours; TAS-383) and generated files.
-const _fontSizeBaseline = 1720; // TAS-387: attendance round 2
-const _hexColorBaseline = 400; // TAS-387: attendance round 2
+const _fontSizeBaseline = 1589; // TAS-392 marketing pages
+const _hexColorBaseline = 370; // TAS-392 marketing pages
 
 void main() {
   final fontSize = RegExp(r'\bfontSize\s*:');

@@ -459,15 +459,28 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
       icon: icon,
       title: title,
       subtitle: arabicSubtitle,
-      action: isPermitted
-          ? null
-          : Tooltip(
-              message: statusPillText,
-              child: Icon(
+      // The access state is a read-only value: icon + text, no pill.
+      labels: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!isPermitted) ...[
+              Icon(
                 Icons.lock_outline_rounded,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: TashilSpacing.xs),
+            ],
+            Text(
+              statusPillText,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+          ],
+        ),
+      ],
       margin: EdgeInsets.zero,
       onTap: onTap,
     );

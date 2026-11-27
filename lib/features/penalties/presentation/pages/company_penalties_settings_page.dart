@@ -2,6 +2,9 @@ import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/core/design/widgets/dialogs.dart';
 import 'package:delegate_app/core/design/money.dart';
+import 'package:delegate_app/core/design/widgets/empty_state.dart';
+import 'package:delegate_app/core/design/widgets/pull_to_refresh.dart';
+import 'package:delegate_app/core/design/widgets/summary_card.dart';
 import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -857,7 +860,7 @@ class _CompanyPenaltiesSettingsPageState
               )!.selectedGroupCount(selectedCount);
             }
 
-            return RefreshIndicator(
+            return PullToRefresh(
               onRefresh: () async {
                 _loadData();
                 await _loadBranchesAndPinned();
@@ -865,11 +868,23 @@ class _CompanyPenaltiesSettingsPageState
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // Official Rules Catalog Quick Link Banner
+                  // Official rules catalog link (TAS-392: kit SummaryCard).
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                      child: InkWell(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        TashilSpacing.lg,
+                        TashilSpacing.md,
+                        TashilSpacing.lg,
+                        TashilSpacing.xs,
+                      ),
+                      child: SummaryCard(
+                        key: const Key('penalties_rules_link'),
+                        icon: Icons.menu_book_rounded,
+                        title: AppLocalizations.of(context)!.violationsPolicy,
+                        subtitle: AppLocalizations.of(
+                          context,
+                        )!.finesPolicyCardSubtitle,
+                        margin: EdgeInsets.zero,
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -879,68 +894,6 @@ class _CompanyPenaltiesSettingsPageState
                             ),
                           );
                         },
-                        borderRadius: BorderRadius.circular(TashilRadius.large),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(
-                              TashilRadius.large,
-                            ),
-                            border: Border.all(color: colorScheme.primary),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.menu_book_rounded,
-                                  color: colorScheme.onPrimary,
-                                  size: 16,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.violationsPolicy,
-                                      style: theme.textTheme.labelLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: colorScheme.onSurface,
-                                          ),
-                                    ),
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.finesPolicyCardSubtitle,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                size: 14,
-                                color: colorScheme.primary,
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ),
@@ -959,11 +912,6 @@ class _CompanyPenaltiesSettingsPageState
                             borderRadius: BorderRadius.circular(
                               TashilRadius.large,
                             ),
-                            border: Border.all(
-                              color: isPinned
-                                  ? _kSuccess(context)
-                                  : colorScheme.outlineVariant,
-                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -972,9 +920,7 @@ class _CompanyPenaltiesSettingsPageState
                                 children: [
                                   Icon(
                                     Icons.storefront_rounded,
-                                    color: isPinned
-                                        ? _kSuccess(context)
-                                        : colorScheme.primary,
+                                    color: colorScheme.primary,
                                     size: 20,
                                   ),
                                   const SizedBox(width: 8),
@@ -988,7 +934,8 @@ class _CompanyPenaltiesSettingsPageState
                                     ),
                                   ),
                                   const Spacer(),
-                                  IconButton.filledTonal(
+                                  IconButton(
+                                    isSelected: isPinned,
                                     tooltip: isPinned
                                         ? AppLocalizations.of(
                                             context,
@@ -996,56 +943,18 @@ class _CompanyPenaltiesSettingsPageState
                                         : AppLocalizations.of(
                                             context,
                                           )!.pinSelectedAsDefault,
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: isPinned
-                                          ? colorScheme.tertiaryContainer
-                                          : colorScheme.surface,
-                                      foregroundColor: isPinned
-                                          ? colorScheme.onTertiaryContainer
-                                          : colorScheme.onSurfaceVariant,
-                                      visualDensity: VisualDensity.compact,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          TashilRadius.small,
-                                        ),
-                                        side: BorderSide(
-                                          color: isPinned
-                                              ? colorScheme.tertiary
-                                              : colorScheme.outlineVariant,
-                                        ),
-                                      ),
-                                    ),
-                                    icon: Icon(
+                                    icon: const Icon(Icons.push_pin_outlined),
+                                    selectedIcon: const Icon(
                                       Icons.push_pin_rounded,
-                                      size: 16,
-                                      color: isPinned
-                                          ? colorScheme.tertiary
-                                          : null,
                                     ),
                                     onPressed: _togglePinCurrentBranches,
                                   ),
                                   const SizedBox(width: 6),
-                                  IconButton.filledTonal(
+                                  IconButton(
                                     tooltip: AppLocalizations.of(
                                       context,
                                     )!.refreshFinesData,
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: colorScheme.surface,
-                                      foregroundColor: colorScheme.primary,
-                                      visualDensity: VisualDensity.compact,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          TashilRadius.small,
-                                        ),
-                                        side: BorderSide(
-                                          color: colorScheme.outlineVariant,
-                                        ),
-                                      ),
-                                    ),
-                                    icon: const Icon(
-                                      Icons.refresh_rounded,
-                                      size: 16,
-                                    ),
+                                    icon: const Icon(Icons.refresh_rounded),
                                     onPressed: () {
                                       _loadData();
                                       _loadBranchesAndPinned();
@@ -1307,9 +1216,11 @@ class _CompanyPenaltiesSettingsPageState
                                         style: theme.textTheme.titleLarge
                                             ?.copyWith(
                                               fontWeight: FontWeight.bold,
+                                              // Zero is neutral (F-04).
                                               color: filteredTotalFines > 0
                                                   ? colorScheme.onSurface
-                                                  : _kSuccess(context),
+                                                  : colorScheme
+                                                        .onSurfaceVariant,
                                             ),
                                       ),
                                     ],
@@ -1346,9 +1257,10 @@ class _CompanyPenaltiesSettingsPageState
                                         style: theme.textTheme.titleLarge
                                             ?.copyWith(
                                               fontWeight: FontWeight.bold,
-                                              color: _kOnSuccessContainer(
-                                                context,
-                                              ),
+                                              color: filteredDeducted > 0
+                                                  ? colorScheme.onSurface
+                                                  : colorScheme
+                                                        .onSurfaceVariant,
                                             ),
                                       ),
                                     ],
@@ -1458,24 +1370,13 @@ class _CompanyPenaltiesSettingsPageState
                               scrollDirection: Axis.horizontal,
                               child: Row(
                                 children: [
-                                  ChoiceChip(
+                                  FilterChip(
                                     label: Text(
                                       AppLocalizations.of(
                                         context,
                                       )!.allCompaniesCount(penalties.length),
-                                      style: TextStyle(
-                                        color: _selectedCompanyFilter == 'all'
-                                            ? colorScheme.onPrimary
-                                            : colorScheme.onSurface,
-                                        fontWeight:
-                                            _selectedCompanyFilter == 'all'
-                                            ? FontWeight.bold
-                                            : FontWeight.normal,
-                                      ),
                                     ),
                                     selected: _selectedCompanyFilter == 'all',
-                                    selectedColor: colorScheme.primary,
-                                    checkmarkColor: colorScheme.onPrimary,
                                     onSelected: (val) {
                                       if (val) {
                                         setState(
@@ -1493,21 +1394,9 @@ class _CompanyPenaltiesSettingsPageState
                                       padding: const EdgeInsets.only(
                                         right: 8.0,
                                       ),
-                                      child: ChoiceChip(
-                                        label: Text(
-                                          '$compName ($count)',
-                                          style: TextStyle(
-                                            color: isSelected
-                                                ? colorScheme.onPrimary
-                                                : colorScheme.onSurface,
-                                            fontWeight: isSelected
-                                                ? FontWeight.bold
-                                                : FontWeight.normal,
-                                          ),
-                                        ),
+                                      child: FilterChip(
+                                        label: Text('$compName ($count)'),
                                         selected: isSelected,
-                                        selectedColor: colorScheme.primary,
-                                        checkmarkColor: colorScheme.onPrimary,
                                         onSelected: (val) {
                                           if (val) {
                                             setState(
@@ -1533,55 +1422,22 @@ class _CompanyPenaltiesSettingsPageState
                     SliverFillRemaining(
                       hasScrollBody: false,
                       child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                // TAS-357: was primary on primary (invisible).
-                                child: Icon(
-                                  Icons.verified_user_rounded,
-                                  size: 56,
-                                  color: colorScheme.onPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                isDelegate
-                                    ? AppLocalizations.of(context)!.recordClean
-                                    : (isOrgAdmin
-                                          ? AppLocalizations.of(
-                                              context,
-                                            )!.noViolationsAnyCompany
-                                          : AppLocalizations.of(
-                                              context,
-                                            )!.noViolationsThisCompany),
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                              if (isDelegate) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  )!.noViolationsRecorded,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+                        child: EmptyState(
+                          icon: Icons.verified_user_rounded,
+                          title: isDelegate
+                              ? AppLocalizations.of(context)!.recordClean
+                              : (isOrgAdmin
+                                    ? AppLocalizations.of(
+                                        context,
+                                      )!.noViolationsAnyCompany
+                                    : AppLocalizations.of(
+                                        context,
+                                      )!.noViolationsThisCompany),
+                          message: isDelegate
+                              ? AppLocalizations.of(
+                                  context,
+                                )!.noViolationsRecorded
+                              : null,
                         ),
                       ),
                     )

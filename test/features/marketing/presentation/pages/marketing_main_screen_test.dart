@@ -1,3 +1,4 @@
+import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart'
     show GlobalCupertinoLocalizations;
@@ -79,6 +80,7 @@ DelegateModel _createDelegateWithRole(UserRole role) {
 
 Widget _buildTestApp(Widget child) {
   return MaterialApp(
+      theme: AppTheme.lightTheme(),
     localizationsDelegates: const [
       AppLocalizations.delegate,
       GlobalMaterialLocalizations.delegate,

@@ -1,3 +1,4 @@
+import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart'
     show GlobalCupertinoLocalizations;
@@ -60,6 +61,7 @@ DelegateModel _createDelegate({
 
 Widget _buildTestApp(Widget child) {
   return MaterialApp(
+      theme: AppTheme.lightTheme(),
     localizationsDelegates: const [
       AppLocalizations.delegate,
       GlobalMaterialLocalizations.delegate,
@@ -140,15 +142,16 @@ void main() {
     expect(find.textContaining('أهلاً بك، رانيا'), findsOneWidget);
 
     // Verify Private Label shortcut banner is rendered
-    expect(find.text('مركز العلامة الخاصة'), findsOneWidget);
+    // TAS-392: Private Label is one of the quick-access cards.
     expect(find.text('Private Label'), findsOneWidget);
     expect(
-      find.text('كافة أدوات التوثيق الميداني والتدقيق والتقارير في مكان واحد'),
+      find.text('توثيق وتدقيق وتقارير'),
       findsOneWidget,
     );
 
     // Tap shortcut banner and verify navigation to tab 3 (PrivateLabelHubScreen)
-    await tester.tap(find.text('مركز العلامة الخاصة'));
+    await tester.ensureVisible(find.byKey(const Key('marketing_quick_private_label')));
+    await tester.tap(find.byKey(const Key('marketing_quick_private_label')));
     await tester.pumpAndSettle();
     expect(navigatedTab, equals(3));
 
@@ -166,8 +169,8 @@ void main() {
     )));
     await tester.pumpAndSettle();
 
-    expect(find.text('تسجيل مخالفة'), findsOneWidget);
-    expect(find.text('تطبيق لائحة الجزاءات'), findsOneWidget);
+    expect(find.text('المخالفات'), findsOneWidget);
+    expect(find.text('تسجيل ومتابعة'), findsOneWidget);
 
     // Navigated tab should remain null when tapping the penalties card
     // (since it pushes CompanyPenaltiesSettingsPage rather than tab switching)
