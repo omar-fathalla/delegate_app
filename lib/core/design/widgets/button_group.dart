@@ -231,10 +231,14 @@ class _ButtonGroupState<T> extends State<ButtonGroup<T>> {
           child: button,
         ),
       );
+      // The label once: without excludeSemantics the Text inside merged with
+      // it («مندوب\nمندوب»), so screen readers said it twice and Maestro's
+      // `visible: "مندوب"` never matched (Mac gate, 27 Nov 2026).
       button = Semantics(
         button: true,
         selected: widget.selected == null ? null : isSelected,
         label: item.label ?? item.tooltip,
+        excludeSemantics: true,
         child: button,
       );
       if (item.tooltip != null) {
