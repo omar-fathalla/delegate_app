@@ -3377,4 +3377,18 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get attBranchNotYourChain =>
       'الفرع ده مش تبع أي سلسلة من سلاسلك. امسح كود الفرع بتاعك.';
+
+  @override
+  String leaveOverlapExists(String type, String from, String to) {
+    return 'عندك إجازة في الأيام دي: فيه طلب $type من $from لـ $to. غيّر التاريخ أو امسح القديم';
+  }
+
+  @override
+  String leaveTooOld(int days) {
+    return 'تقدر تطلب لحد $days أيام فاتوا بس، وللأقدم كلّم الـ HR';
+  }
+
+  @override
+  String get leaveMustStartToday =>
+      'الطلب ده لازم يبدأ من النهارده أو بعده، وللأقدم كلّم الـ HR';
 }

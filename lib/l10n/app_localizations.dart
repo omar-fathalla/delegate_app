@@ -5975,6 +5975,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This branch is not in any of your chains. Scan your own branch\'s code.'**
   String get attBranchNotYourChain;
+
+  /// No description provided for @leaveOverlapExists.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have leave on these days: a {type} request from {from} to {to}. Change the dates or delete the old one'**
+  String leaveOverlapExists(String type, String from, String to);
+
+  /// No description provided for @leaveTooOld.
+  ///
+  /// In en, this message translates to:
+  /// **'You can only request up to {days} days back; for older dates contact HR'**
+  String leaveTooOld(int days);
+
+  /// No description provided for @leaveMustStartToday.
+  ///
+  /// In en, this message translates to:
+  /// **'This request must start today or later; for older dates contact HR'**
+  String get leaveMustStartToday;
 }
 
 class _AppLocalizationsDelegate

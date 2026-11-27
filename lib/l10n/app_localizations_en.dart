@@ -3373,4 +3373,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get attBranchNotYourChain =>
       'This branch is not in any of your chains. Scan your own branch\'s code.';
+
+  @override
+  String leaveOverlapExists(String type, String from, String to) {
+    return 'You already have leave on these days: a $type request from $from to $to. Change the dates or delete the old one';
+  }
+
+  @override
+  String leaveTooOld(int days) {
+    return 'You can only request up to $days days back; for older dates contact HR';
+  }
+
+  @override
+  String get leaveMustStartToday =>
+      'This request must start today or later; for older dates contact HR';
 }

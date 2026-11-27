@@ -3922,11 +3922,23 @@ service cloud.firestore {
 
 
     match /leave_requests/{requestId} {
+      // TAS-370 (user decision 2026-11-27): how far back a delegate may file.
+      // Sick, emergency and excused absence: 7 days. Hourly excuses keep the
+      // picker's 30 days. Annual, unpaid and anything else: from today. One
+      // extra day covers the device's midnight vs. the server's clock.
+      function leaveBackdateDays(d) {
+        return d.get('isHourly', false) == true ? 31
+          : (d.get('type', '') in ['sick', 'emergency', 'absence'] ? 8 : 1);
+      }
       function leaveOwnerCreateOk() {
         let d = request.resource.data;
         return d.get('status', '') == 'pending'
           && d.get('resolvedBy', null) == null
-          && d.get('resolvedAt', null) == null;
+          && d.get('resolvedAt', null) == null
+          && d.get('startDate', null) is timestamp
+          && d.get('endDate', null) is timestamp
+          && d.endDate >= d.startDate
+          && d.startDate >= request.time - duration.value(leaveBackdateDays(d), 'd');
       }
 
       // Split allow rules so a company+status list is provable for HR

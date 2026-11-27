@@ -2585,11 +2585,19 @@ allow update, delete: if isGlobalStaff();
 }
 }
 match /leave_requests/{requestId} {
+function leaveBackdateDays(d) {
+return d.get('isHourly', false) == true ? 31
+: (d.get('type', '') in ['sick', 'emergency', 'absence'] ? 8 : 1);
+}
 function leaveOwnerCreateOk() {
 let d = request.resource.data;
 return d.get('status', '') == 'pending'
 && d.get('resolvedBy', null) == null
-&& d.get('resolvedAt', null) == null;
+&& d.get('resolvedAt', null) == null
+&& d.get('startDate', null) is timestamp
+&& d.get('endDate', null) is timestamp
+&& d.endDate >= d.startDate
+&& d.startDate >= request.time - duration.value(leaveBackdateDays(d), 'd');
 }
 allow read: if staffToken() && canReadOrgAdminRequestInOwnOrg();
 allow read: if staffToken() && isGlobalStaff();
