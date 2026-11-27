@@ -543,20 +543,26 @@ class _DelegateTrackingCardState extends State<DelegateTrackingCard> {
               ],
             ),
           ),
-          // Last update
+          // Last update. TAS-364: «التتبع واقف» after 15 min without a signal
+          // while the delegate is still checked in.
           Tooltip(
             message: 'توقيت آخر إشارة: $timeStr',
             child: Row(
+              key: Key('tracking_last_signal_${session.delegateId}'),
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.access_time_rounded, size: 13, color: colorScheme.primary),
+                Icon(
+                  session.isTrackingStale ? Icons.location_off_rounded : Icons.access_time_rounded,
+                  size: 13,
+                  color: session.isTrackingStale ? colorScheme.error : colorScheme.primary,
+                ),
                 const SizedBox(width: 3),
                 Text(
-                  timeStr,
+                  session.isTrackingStale ? 'التتبع واقف • $timeStr' : timeStr,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
-                    color: colorScheme.primary,
+                    color: session.isTrackingStale ? colorScheme.error : colorScheme.primary,
                   ),
                 ),
               ],

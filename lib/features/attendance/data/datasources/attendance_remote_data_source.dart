@@ -1534,7 +1534,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       DelegateTrackingEngine().stopTrackingSession();
       await firestore.collection('delegate_tracking').doc(userId).update({
         'currentStatus': 'checked_out',
-        'isTrackingEnabled': false,
+        // TAS-364: the session ends by status; isTrackingEnabled is the
+        // supervisor's switch and a check-out no longer touches it.
+        'isOnline': false,
         'checkOutTime': FieldValue.serverTimestamp(),
         'lastUpdated': FieldValue.serverTimestamp(),
       });
