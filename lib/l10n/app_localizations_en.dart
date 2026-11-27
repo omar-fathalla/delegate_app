@@ -1570,6 +1570,81 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileHideId => 'Hide number';
 
   @override
+  String get taskStart => 'Start task';
+
+  @override
+  String get taskFinish => 'Mark as done';
+
+  @override
+  String get taskOverdueLabel => 'Overdue';
+
+  @override
+  String taskOverdueBanner(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'This task is $count days overdue',
+      one: 'This task is 1 day overdue',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String taskDueInDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'In $count days',
+      one: 'Tomorrow',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get taskProofSection => 'Proof of work';
+
+  @override
+  String get taskFrom => 'From';
+
+  @override
+  String get taskAssignedToLabel => 'For';
+
+  @override
+  String get taskAssignedAll => 'All delegates';
+
+  @override
+  String get taskSentAt => 'Sent';
+
+  @override
+  String get taskDoneAt => 'Done';
+
+  @override
+  String get tasksFilterOpen => 'Open';
+
+  @override
+  String get tasksFilterDone => 'Done';
+
+  @override
+  String get tasksGroupOverdue => 'Overdue';
+
+  @override
+  String get tasksGroupOpen => 'Coming up';
+
+  @override
+  String get tasksGroupDone => 'Finished';
+
+  @override
+  String taskLateBy(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days late',
+      one: '1 day late',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get allChains => 'All chains';
 
   @override

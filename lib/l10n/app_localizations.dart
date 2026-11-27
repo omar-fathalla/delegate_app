@@ -2930,6 +2930,108 @@ abstract class AppLocalizations {
   /// **'Hide number'**
   String get profileHideId;
 
+  /// No description provided for @taskStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start task'**
+  String get taskStart;
+
+  /// No description provided for @taskFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as done'**
+  String get taskFinish;
+
+  /// No description provided for @taskOverdueLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get taskOverdueLabel;
+
+  /// No description provided for @taskOverdueBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{This task is 1 day overdue} other{This task is {count} days overdue}}'**
+  String taskOverdueBanner(int count);
+
+  /// No description provided for @taskDueInDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Tomorrow} other{In {count} days}}'**
+  String taskDueInDays(int count);
+
+  /// No description provided for @taskProofSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof of work'**
+  String get taskProofSection;
+
+  /// No description provided for @taskFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get taskFrom;
+
+  /// No description provided for @taskAssignedToLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'For'**
+  String get taskAssignedToLabel;
+
+  /// No description provided for @taskAssignedAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All delegates'**
+  String get taskAssignedAll;
+
+  /// No description provided for @taskSentAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get taskSentAt;
+
+  /// No description provided for @taskDoneAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get taskDoneAt;
+
+  /// No description provided for @tasksFilterOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get tasksFilterOpen;
+
+  /// No description provided for @tasksFilterDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get tasksFilterDone;
+
+  /// No description provided for @tasksGroupOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get tasksGroupOverdue;
+
+  /// No description provided for @tasksGroupOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming up'**
+  String get tasksGroupOpen;
+
+  /// No description provided for @tasksGroupDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get tasksGroupDone;
+
+  /// No description provided for @taskLateBy.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day late} other{{count} days late}}'**
+  String taskLateBy(int count);
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

@@ -1574,6 +1574,87 @@ class AppLocalizationsAr extends AppLocalizations {
   String get profileHideId => 'إخفاء الرقم';
 
   @override
+  String get taskStart => 'ابدأ المهمة';
+
+  @override
+  String get taskFinish => 'خلّصت المهمة';
+
+  @override
+  String get taskOverdueLabel => 'متأخرة';
+
+  @override
+  String taskOverdueBanner(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'المهمة دي متأخرة $count يوم',
+      few: 'المهمة دي متأخرة $count أيام',
+      two: 'المهمة دي متأخرة يومين',
+      one: 'المهمة دي متأخرة يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String taskDueInDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'بعد $count يوم',
+      few: 'بعد $count أيام',
+      two: 'بعد يومين',
+      one: 'بكرة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get taskProofSection => 'إثبات التنفيذ';
+
+  @override
+  String get taskFrom => 'من';
+
+  @override
+  String get taskAssignedToLabel => 'لمين';
+
+  @override
+  String get taskAssignedAll => 'كل المناديب';
+
+  @override
+  String get taskSentAt => 'اتبعتت';
+
+  @override
+  String get taskDoneAt => 'اتنفذت';
+
+  @override
+  String get tasksFilterOpen => 'المفتوحة';
+
+  @override
+  String get tasksFilterDone => 'المنجزة';
+
+  @override
+  String get tasksGroupOverdue => 'متأخرة';
+
+  @override
+  String get tasksGroupOpen => 'الجاية';
+
+  @override
+  String get tasksGroupDone => 'خلصت';
+
+  @override
+  String taskLateBy(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'متأخرة $count يوم',
+      few: 'متأخرة $count أيام',
+      two: 'متأخرة يومين',
+      one: 'متأخرة يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override

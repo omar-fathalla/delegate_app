@@ -48,6 +48,7 @@ class SummaryCard extends StatelessWidget {
     this.facts = const [],
     this.onTap,
     this.action,
+    this.leading,
     this.margin = const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
   });
 
@@ -72,6 +73,9 @@ class SummaryCard extends StatelessWidget {
   /// Optional item menu at the very end of the header (C-24 `MenuAnchor`
   /// with an `IconButton`), for actions on the record.
   final Widget? action;
+
+  /// Replaces the icon circle (a small thumbnail of the record's photo).
+  final Widget? leading;
   final EdgeInsetsGeometry margin;
 
   @override
@@ -82,11 +86,15 @@ class SummaryCard extends StatelessWidget {
     final header = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(TashilSpacing.sm),
-          decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
-          child: Icon(icon, size: 20, color: cs.onPrimary),
-        ),
+        leading ??
+            Container(
+              padding: const EdgeInsets.all(TashilSpacing.sm),
+              decoration: BoxDecoration(
+                color: cs.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 20, color: cs.onPrimary),
+            ),
         const SizedBox(width: TashilSpacing.md),
         Expanded(
           child: Column(
