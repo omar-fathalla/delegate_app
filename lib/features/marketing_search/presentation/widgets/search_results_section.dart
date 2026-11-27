@@ -1,5 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/empty_state.dart';
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+
 import '../bloc/marketing_search_state.dart';
 import 'company_result_card.dart';
 import 'delegate_result_card.dart';
@@ -14,27 +18,18 @@ class SearchResultsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // عنوان القسم
-        Row(
-          children: [
-            Icon(Icons.list_alt_rounded, color: colorScheme.primary, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'النتائج',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+        Text(
+          'النتائج',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
         ),
-
-        const SizedBox(height: 16),
+        const SizedBox(height: TashilSpacing.sm),
 
         // عرض النتائج حسب الحالة
         _buildStateContent(context),
@@ -66,70 +61,29 @@ class SearchResultsSection extends StatelessWidget {
     };
   }
 
-  /// حالة البداية - لم يتم البحث بعد
+  /// حالة البداية - لم يتم البحث بعد (TAS-392: kit EmptyState).
   Widget _buildInitialState(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant, width: 1),
-      ),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 48,
-              color: colorScheme.outline,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'لم يتم البحث بعد',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'استخدم حقول البحث أعلاه',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.outline,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const EmptyState(
+      icon: Icons.search_rounded,
+      title: 'لم يتم البحث بعد',
+      message: 'استخدم حقول البحث أعلاه',
     );
   }
 
-  /// حالة التحميل
   Widget _buildLoadingState(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Center(
-        child: Column(
-          children: [
-            CircularProgressIndicator(color: colorScheme.primary),
-            const SizedBox(height: 16),
-            Text(
-              'جاري البحث...',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+    return Padding(
+      padding: const EdgeInsets.all(TashilSpacing.xl),
+      child: Column(
+        children: [
+          const LoadingIndicator(),
+          const SizedBox(height: TashilSpacing.md),
+          Text(
+            'جاري البحث...',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -222,91 +176,19 @@ class SearchResultsSection extends StatelessWidget {
 
   /// حالة عدم وجود نتائج
   Widget _buildEmptyState(BuildContext context, MarketingSearchEmpty state) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     final isCompany = state.searchType == 'company';
-
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant, width: 1),
-      ),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
-              isCompany
-                  ? Icons.business_rounded
-                  : Icons.person_outline_rounded,
-              size: 48,
-              color: colorScheme.outline,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              isCompany ? 'لا توجد شركات مطابقة' : 'لا يوجد مندوبين مطابقين',
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'البحث: "${state.searchQuery}"',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.outline,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: Icons.search_off_rounded,
+      title: isCompany ? 'لا توجد شركات مطابقة' : 'لا يوجد مندوبين مطابقين',
+      message: 'البحث: "${state.searchQuery}"',
     );
   }
 
-  /// حالة الخطأ
   Widget _buildErrorState(BuildContext context, MarketingSearchError state) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: colorScheme.errorContainer.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.error.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              size: 48,
-              color: colorScheme.error,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'حدث خطأ',
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: colorScheme.error,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              state.message,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onErrorContainer,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: Icons.error_outline_rounded,
+      title: 'حدث خطأ',
+      message: state.message,
     );
   }
 }

@@ -56,7 +56,9 @@ class MarketingSearchRepositoryImpl implements MarketingSearchRepository {
     } on FirebaseException catch (e) {
       return Left(ServerFailure(_mapFirebaseError(e)));
     } catch (e) {
-      return Left(ServerFailure('حدث خطأ غير متوقع أثناء البحث عن المندوب برقم الموبايل'));
+      return Left(
+        ServerFailure('حدث خطأ غير متوقع أثناء البحث عن المندوب برقم الموبايل'),
+      );
     }
   }
 
@@ -84,9 +86,13 @@ class MarketingSearchRepositoryImpl implements MarketingSearchRepository {
       // TAS-270: the message names the search actually run (name, or
       // name + phone), never the raw exception.
       final withPhone = phoneNumber != null && phoneNumber.trim().isNotEmpty;
-      return Left(ServerFailure(withPhone
-          ? 'حدث خطأ غير متوقع أثناء البحث عن المندوب بالاسم ورقم الموبايل'
-          : 'حدث خطأ غير متوقع أثناء البحث عن المندوب بالاسم'));
+      return Left(
+        ServerFailure(
+          withPhone
+              ? 'حدث خطأ غير متوقع أثناء البحث عن المندوب بالاسم ورقم الموبايل'
+              : 'حدث خطأ غير متوقع أثناء البحث عن المندوب بالاسم',
+        ),
+      );
     }
   }
 

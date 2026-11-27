@@ -23,12 +23,11 @@ void main() {
     );
 
     // Verify UI elements
-    expect(find.text('البحث عن مندوب'), findsOneWidget);
     expect(find.text('اسم المندوب'), findsOneWidget);
     expect(find.text('رقم الموبايل'), findsOneWidget);
     expect(find.text('بحث عن المندوب'), findsOneWidget);
     expect(find.byType(TextField), findsNWidgets(2));
-    expect(find.byType(ElevatedButton), findsOneWidget);
+    expect(find.byType(FilledButton), findsOneWidget);
 
     // Enter name
     await tester.enterText(find.byType(TextField).first, 'أحمد محمد');
@@ -39,7 +38,7 @@ void main() {
     expect(phoneController.text, '01012345678');
 
     // Tap search button
-    await tester.tap(find.byType(ElevatedButton));
+    await tester.tap(find.byType(FilledButton));
     await tester.pump();
 
     // Verify callback

@@ -3,6 +3,9 @@ import 'dart:developer' as developer;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/button_group.dart';
 
 import '../../../../injection_container.dart' as di;
 import '../../../auth/data/datasources/auth_local_data_source.dart';
@@ -39,6 +42,8 @@ class _MarketingSearchView extends StatefulWidget {
 }
 
 class _MarketingSearchViewState extends State<_MarketingSearchView> {
+  _SearchMode _mode = _SearchMode.company;
+
   final TextEditingController _companyNameController = TextEditingController();
   final TextEditingController _delegateNameController = TextEditingController();
   final TextEditingController _phoneNumberController = TextEditingController();
@@ -158,15 +163,7 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
     // Show error if no organization UID
     if (_actualOrganizationUID == null) {
       return Scaffold(
-        backgroundColor: colorScheme.surfaceContainerLowest,
-        appBar: AppBar(
-          title: const Text('البحث'),
-          backgroundColor: colorScheme.surfaceContainer,
-          elevation: 0,
-          shape: Border(
-            bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
-          ),
-        ),
+        appBar: AppBar(title: const Text('البحث')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -196,29 +193,14 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
       );
     }
 
+    // TAS-392: one search at a time. A connected ButtonGroup picks company or
+    // delegate, so the screen keeps a single FilledButton.
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
-        titleSpacing: 0,
-        title: Text(
-          'البحث',
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: colorScheme.surfaceContainer,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        shape: Border(
-          bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
-        ),
-        scrolledUnderElevation: 0,
-        iconTheme: IconThemeData(color: colorScheme.onSurface),
+        title: const Text('البحث'),
         actions: [
-          // زر مسح البحث
           BlocBuilder<MarketingSearchBloc, MarketingSearchState>(
             builder: (context, state) {
-              // إظهار الزر فقط إذا كان هناك نتائج
               if (state is CompanySearchSuccess ||
                   state is DelegateSearchSuccess ||
                   state is MarketingSearchEmpty) {
@@ -233,42 +215,53 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // قسم البحث عن الشركات
-            CompanySearchSection(
-              controller: _companyNameController,
-              onSearch: _onSearchCompany,
-            ),
-
-            const SizedBox(height: 24),
-
-            // فاصل
-            Divider(color: colorScheme.outlineVariant, thickness: 1),
-
-            const SizedBox(height: 24),
-
-            // قسم البحث عن المندوبين
-            DelegateSearchSection(
-              nameController: _delegateNameController,
-              phoneController: _phoneNumberController,
-              onSearch: _onSearchDelegate,
-            ),
-
-            const SizedBox(height: 32),
-
-            // قسم النتائج
-            BlocBuilder<MarketingSearchBloc, MarketingSearchState>(
-              builder: (context, state) {
-                return SearchResultsSection(state: state);
-              },
-            ),
-          ],
-        ),
+      body: ListView(
+        padding: const EdgeInsets.all(TashilSpacing.lg),
+        children: [
+          ButtonGroup<_SearchMode>(
+            key: const Key('marketing_search_mode'),
+            expand: true,
+            selected: {_mode},
+            onSelectionChanged: (v) => setState(() => _mode = v.first),
+            items: const [
+              ButtonGroupItem(
+                key: Key('marketing_search_mode_company'),
+                value: _SearchMode.company,
+                label: 'شركة',
+                icon: Icons.business_rounded,
+              ),
+              ButtonGroupItem(
+                key: Key('marketing_search_mode_delegate'),
+                value: _SearchMode.delegate,
+                label: 'مندوب',
+                icon: Icons.person_rounded,
+              ),
+            ],
+          ),
+          const SizedBox(height: TashilSpacing.lg),
+          AnimatedSwitcher(
+            duration: AppMotionDurations.short4,
+            child: _mode == _SearchMode.company
+                ? CompanySearchSection(
+                    key: const ValueKey('company'),
+                    controller: _companyNameController,
+                    onSearch: _onSearchCompany,
+                  )
+                : DelegateSearchSection(
+                    key: const ValueKey('delegate'),
+                    nameController: _delegateNameController,
+                    phoneController: _phoneNumberController,
+                    onSearch: _onSearchDelegate,
+                  ),
+          ),
+          const SizedBox(height: TashilSpacing.xl),
+          BlocBuilder<MarketingSearchBloc, MarketingSearchState>(
+            builder: (context, state) => SearchResultsSection(state: state),
+          ),
+        ],
       ),
     );
   }
 }
+
+enum _SearchMode { company, delegate }

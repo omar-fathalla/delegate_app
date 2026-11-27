@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:intl/intl.dart' as intl;
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/summary_card.dart';
 
 import '../../../admin/domain/entities/company.dart';
 import '../../../marketing/presentation/pages/marketing_delegates_screen.dart';
@@ -17,236 +18,68 @@ class CompanyResultCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainerLow,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MarketingDelegatesScreen(
-                organizationUID: company.organizationUID,
-                companyUID: company.uid,
-                companyName: company.name,
-              ),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // الصف الأول: الأيقونة والاسم
-              Row(
-                children: [
-                  // أيقونة الشركة
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.business_rounded,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 24,
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  // اسم الشركة
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          company.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: colorScheme.onSurface,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (company.companyCodeInOrg.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'الكود: ${company.companyCodeInOrg}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ] else if (company.code != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'الكود: ${company.code}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  // سهم للتفاصيل
-                  Icon(Icons.chevron_right_rounded, color: colorScheme.outline),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // الفاصل
-              Divider(color: colorScheme.outlineVariant, height: 1),
-
-              const SizedBox(height: 12),
-
-              // معلومات إضافية
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  // النوع
-                  _buildInfoChip(
-                    context,
-                    icon: Icons.category_rounded,
-                    label: company.type,
-                    color: colorScheme.tertiaryContainer,
-                    textColor: colorScheme.onTertiaryContainer,
-                  ),
-
-                  // الحالة
-                  _buildInfoChip(
-                    context,
-                    icon: Icons.check_circle_rounded,
-                    label: _getStatusLabel(company.status, isArabic),
-                    color: _getStatusColor(company.status, colorScheme),
-                    textColor: _getStatusTextColor(company.status, colorScheme),
-                  ),
-
-                  // عدد المندوبين
-                  if (company.delegates > 0)
-                    _buildInfoChip(
-                      context,
-                      icon: Icons.people_rounded,
-                      label: '${company.delegates} مندوب',
-                      color: colorScheme.secondaryContainer,
-                      textColor: colorScheme.onSecondaryContainer,
-                    ),
-
-                  // الدفع المؤجل
-                  if (company.deferredPayment)
-                    _buildInfoChip(
-                      context,
-                      icon: Icons.payment_rounded,
-                      label: 'دفع مؤجل',
-                      color: colorScheme.primaryContainer,
-                      textColor: colorScheme.onPrimaryContainer,
-                    ),
-                ],
-              ),
-
-              // معلومات الاتصال (إذا وُجدت)
-              if (company.phone != null || company.email != null) ...[
-                const SizedBox(height: 12),
-                Divider(color: colorScheme.outlineVariant, height: 1),
-                const SizedBox(height: 12),
-                if (company.phone != null)
-                  _buildContactInfo(
-                    context,
-                    icon: Icons.phone_rounded,
-                    text: company.phone!,
-                  ),
-                if (company.email != null) ...[
-                  if (company.phone != null) const SizedBox(height: 6),
-                  _buildContactInfo(
-                    context,
-                    icon: Icons.email_rounded,
-                    text: company.email!,
-                  ),
-                ],
-              ],
-
-              // تاريخ الإنشاء
-              const SizedBox(height: 12),
-              Text(
-                'تاريخ الإنشاء: ${_formatDate(company.createdAt, isArabic)}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.outline,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// بناء Chip للمعلومات
-  Widget _buildInfoChip(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required Color textColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: textColor),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// بناء معلومات الاتصال
-  Widget _buildContactInfo(
-    BuildContext context, {
-    required IconData icon,
-    required String text,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Row(
+    Widget value(IconData icon, String text) => Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: colorScheme.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
+        Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: TashilSpacing.xs),
+        Text(
+          text,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       ],
+    );
+
+    final code = company.companyCodeInOrg.isNotEmpty
+        ? company.companyCodeInOrg
+        : company.code?.toString();
+
+    // TAS-392: one SummaryCard per result; status is the only coloured label.
+    return SummaryCard(
+      icon: Icons.business_rounded,
+      title: company.name,
+      subtitle: code == null ? null : 'الكود: $code',
+      labels: [
+        SummaryLabel(
+          _getStatusLabel(company.status, isArabic),
+          container: _getStatusColor(company.status, colorScheme),
+          onContainer: _getStatusTextColor(company.status, colorScheme),
+        ),
+        if (company.type.isNotEmpty)
+          value(Icons.category_rounded, company.type),
+        if (company.delegates > 0)
+          value(Icons.people_rounded, '${company.delegates} مندوب'),
+        if (company.deferredPayment) value(Icons.payment_rounded, 'دفع مؤجل'),
+      ],
+      facts: [
+        if (company.phone != null)
+          SummaryFact(
+            label: isArabic ? 'الهاتف' : 'Phone',
+            value: company.phone!,
+            icon: Icons.phone_rounded,
+          ),
+        if (company.email != null)
+          SummaryFact(
+            label: isArabic ? 'البريد' : 'Email',
+            value: company.email!,
+            icon: Icons.email_rounded,
+          ),
+      ],
+      margin: EdgeInsets.zero,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MarketingDelegatesScreen(
+              organizationUID: company.organizationUID,
+              companyUID: company.uid,
+              companyName: company.name,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -298,11 +131,5 @@ class CompanyResultCard extends StatelessWidget {
       default:
         return colorScheme.onSurface;
     }
-  }
-
-  /// تنسيق التاريخ
-  String _formatDate(DateTime date, bool isArabic) {
-    final formatter = intl.DateFormat('dd MMM yyyy', isArabic ? 'ar' : 'en');
-    return formatter.format(date);
   }
 }
