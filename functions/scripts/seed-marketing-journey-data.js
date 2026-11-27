@@ -8,7 +8,7 @@
  * - today's 3 check-ins on «Fake Branch Alpha»
  *   (`attendance_logs/seed-fake-journey-<yyyymmdd>-<delegate>`);
  * - 2 tasks assigned to the marketing user, back to pending / inProgress;
- * - 2 field photos on permission seed-fake-tas392-pp1;
+ * - permission seed-fake-tas392-pp1 dates (-2 / +12 days) and its 2 field photos;
  * - 1 issued penalty on Fake Company Alpha;
  * - 2 notifications for the marketing user (one unread).
  *
@@ -106,6 +106,8 @@ async function main() {
   // Field photos on the approved permission (image reused from the dev photo).
   const pp = `organizations/${ORG}/companies/${CO}/photo_permissions/seed-fake-tas392-pp1`;
   if ((await db.doc(pp).get()).exists) {
+    // The Patrol journey edits these dates; put them back each run.
+    await db.doc(pp).update({ startDate: dayAt(-2, 10), endDate: dayAt(12, 10), status: "approved" });
     const tmpl = (await db.collection(
       "organizations/org_dev_test/companies/co_dev_test/photo_permissions/perm_dev_test_m31_20261110/captured_photos",
     ).limit(1).get()).docs[0]?.data();

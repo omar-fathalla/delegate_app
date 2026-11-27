@@ -11,6 +11,7 @@ DEFAULT_TARGETS=(
   patrol_test/integration_push_notification_test.dart
   patrol_test/integration_offline_sync_lifecycle_test.dart
   patrol_test/integration_marketing_floor_check_test.dart
+  patrol_test/integration_marketing_export_and_dates_test.dart
 )
 
 targets=()

@@ -34,10 +34,14 @@ MAESTRO_ARGS=(
 # optional account).
 run_marketing() {
   if [[ -z "${TASHIL_MAESTRO_DEV_MARKETING_SECRET:-}" ]]; then
-    echo "maestro: TASHIL_MAESTRO_DEV_MARKETING_SECRET not set, skipping dev-marketing-navigation-logout" | tee -a "$LOG"
+    echo "maestro: TASHIL_MAESTRO_DEV_MARKETING_SECRET not set, skipping the dev-marketing-* journeys" | tee -a "$LOG"
     return 0
   fi
-  run_one "$@" "${MAESTRO_ARGS[@]}" maestro/flows/dev-marketing-navigation-logout.yaml
+  local flow
+  # Full marketing journey (TAS-393), one file per area so a failure names it.
+  for flow in maestro/flows/dev-marketing-[1-5]-*.yaml; do
+    run_one "$@" "${MAESTRO_ARGS[@]}" "$flow"
+  done
 }
 
 run_one() {
