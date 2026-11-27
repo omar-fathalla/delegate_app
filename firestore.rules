@@ -1735,9 +1735,22 @@ service cloud.firestore {
           allow delete: if isGlobalStaff() || photoPromotionDeleteOnNested(orgId, compId);
 
           match /captured_photos/{photoId} {
+            // TAS-369: a delegate writes its own photos only, and a late
+            // upload (taken offline) is accepted until 48 h after the
+            // permission's last day (endDate is inclusive), with the capture
+            // time inside the permission. Old docs without dates pass.
+            function capturedPhotoTimeOk() {
+              let end = get(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/photo_permissions/$(permissionId)).data.get('endDate', null);
+              let shot = request.resource.data.get('deviceCapturedAt', null);
+              return !(end is timestamp)
+                || (request.time <= end + duration.value(72, 'h')
+                  && (!(shot is timestamp) || shot <= end + duration.value(24, 'h')));
+            }
             allow create: if signedIn() && (staffToken()
               ? staffTargetOk(orgId, compId, true)
-              : (delegateInOrg(orgId) && delegateInCompany(compId)));
+              : (delegateInOrg(orgId) && delegateInCompany(compId)
+                && ownsDelegateId(request.resource.data.get('delegateUID', ''))
+                && capturedPhotoTimeOk()));
             allow update: if false;
             // TAS-402 (user decision 2026-11-27): branch marketing (`marketing`)
             // may not delete delegates' field photos, though it is org-scoped

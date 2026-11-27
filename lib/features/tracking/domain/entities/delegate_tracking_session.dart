@@ -118,6 +118,19 @@ class DelegateTrackingSession extends Equatable {
   bool get isOutside => currentStatus == TrackingStatus.outsideZone;
   bool get isOffline => currentStatus == TrackingStatus.offline || !isOnline;
 
+  /// TAS-364: no signal for this long during an open session = «التتبع واقف»
+  /// (computed from the server's lastUpdated, no function needed).
+  static const Duration staleAfter = Duration(minutes: 15);
+
+  /// True when the delegate is still checked in but the phone stopped sending.
+  bool isTrackingStaleAt(DateTime now) =>
+      (currentStatus == TrackingStatus.insideZone ||
+          currentStatus == TrackingStatus.outsideZone ||
+          currentStatus == TrackingStatus.forgotSignature) &&
+      now.difference(lastUpdated) > staleAfter;
+
+  bool get isTrackingStale => isTrackingStaleAt(DateTime.now());
+
   bool get isSuspended => currentStatus == TrackingStatus.suspended;
 
   bool get isInGracePeriod {

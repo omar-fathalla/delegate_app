@@ -13,6 +13,7 @@ import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bl
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bloc.dart';
 import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/core/services/sync_manager.dart';
 
 /// Logout confirmation (TAS-350, m3-kit C-27): a basic M3 [AlertDialog]
 /// opened with [showTashilDialog] on every window size and for every role.
@@ -49,6 +50,17 @@ class _LogoutDialog extends StatefulWidget {
 
 class _LogoutDialogState extends State<_LogoutDialog> {
   bool _isLoggingOut = false;
+
+  /// TAS-369 (message 5.3): photos of this delegate still on the phone.
+  /// They are kept for the next sign-in, but warn before leaving.
+  int get _pendingPhotos {
+    try {
+      if (!sl.isRegistered<SyncManager>()) return 0;
+      return sl<SyncManager>().statusNotifier.value.pendingCount;
+    } catch (_) {
+      return 0;
+    }
+  }
 
   Future<void> _handleLogout() async {
     if (_isLoggingOut) return;
@@ -118,11 +130,16 @@ class _LogoutDialogState extends State<_LogoutDialog> {
       child: AlertDialog(
         icon: const Icon(Icons.logout_rounded),
         title: Text(l10n.logoutDialogTitle),
-        content: Text(l10n.logoutDialogBody),
+        content: _pendingPhotos > 0
+            ? Text(
+                l10n.logoutPendingPhotosWarning(_pendingPhotos),
+                key: const Key('logout_pending_photos_warning'),
+              )
+            : Text(l10n.logoutDialogBody),
         actions: [
           TextButton(
             onPressed: _isLoggingOut ? null : () => Navigator.of(context).pop(),
-            child: Text(l10n.cancel),
+            child: Text(_pendingPhotos > 0 ? l10n.logoutWaitForPhotos : l10n.cancel),
           ),
           tashilMaestroDevSemantics(
             identifier: 'tashil_logout_confirm_button',
@@ -139,7 +156,7 @@ class _LogoutDialogState extends State<_LogoutDialog> {
                         semanticsLabel: l10n.logout,
                       ),
                     )
-                  : Text(l10n.logout),
+                  : Text(_pendingPhotos > 0 ? l10n.logoutAnyway : l10n.logout),
             ),
           ),
         ],
