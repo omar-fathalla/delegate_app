@@ -3032,6 +3032,30 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 day late} other{{count} days late}}'**
   String taskLateBy(int count);
 
+  /// No description provided for @captureStepPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Place'**
+  String get captureStepPlace;
+
+  /// No description provided for @captureStepPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get captureStepPhotos;
+
+  /// No description provided for @capturePermissionUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission valid until {date}'**
+  String capturePermissionUntil(String date);
+
+  /// No description provided for @captureTapToReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a photo to view it large, retake or remove it.'**
+  String get captureTapToReview;
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

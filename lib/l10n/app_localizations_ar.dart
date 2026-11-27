@@ -1655,6 +1655,21 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get captureStepPlace => 'المكان';
+
+  @override
+  String get captureStepPhotos => 'الصور';
+
+  @override
+  String capturePermissionUntil(String date) {
+    return 'الإذن ساري لحد $date';
+  }
+
+  @override
+  String get captureTapToReview =>
+      'دوس على أي صورة علشان تشوفها كبيرة، أو تعيدها، أو تمسحها.';
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override

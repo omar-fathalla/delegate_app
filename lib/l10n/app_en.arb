@@ -1614,6 +1614,11 @@
   "tasksGroupDone": "Finished",
   "taskLateBy": "{count, plural, =1{1 day late} other{{count} days late}}",
   "@taskLateBy": {"placeholders": {"count": {"type": "int"}}},
+  "captureStepPlace": "Place",
+  "captureStepPhotos": "Photos",
+  "capturePermissionUntil": "Permission valid until {date}",
+  "@capturePermissionUntil": {"placeholders": {"date": {"type": "String"}}},
+  "captureTapToReview": "Tap a photo to view it large, retake or remove it.",
   "allChains": "All chains",
   "attNoSessionsInChain": "No attendance records for {chain} this month",
   "@attNoSessionsInChain": {

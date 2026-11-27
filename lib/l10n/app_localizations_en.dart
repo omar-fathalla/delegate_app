@@ -1645,6 +1645,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get captureStepPlace => 'Place';
+
+  @override
+  String get captureStepPhotos => 'Photos';
+
+  @override
+  String capturePermissionUntil(String date) {
+    return 'Permission valid until $date';
+  }
+
+  @override
+  String get captureTapToReview =>
+      'Tap a photo to view it large, retake or remove it.';
+
+  @override
   String get allChains => 'All chains';
 
   @override
