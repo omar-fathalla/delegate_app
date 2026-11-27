@@ -63,6 +63,7 @@
     "test:rules:tas87": "bash scripts/emulators_exec.sh --only firestore --project demo-tas87 \"node --test test/rules/tas87-delegate-stats.test.js\"",
     "test:e2e:claims-sync": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only auth,firestore --project demo-tas23-claims \"node --test functions/test/staff_claims_sync.emulator.test.js\"",
     "test:rules:tas87-stats-trigger": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas87-fn \"node --test functions/test/delegate_stats.emulator.test.js\"",
+    "test:rules:tas361-attendance-trigger": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas361 \"node --test functions/test/attendance_verify.emulator.test.js\"",
     "test:rules:tas402-photo-delete": "bash scripts/emulators_exec.sh --only firestore --project demo-tas402-photo-delete \"node --test test/rules/tas402-marketing-photo-delete.test.js\"",
     "test:rules:tas368-completions": "bash scripts/emulators_exec.sh --only firestore --project demo-tas368 \"node --test test/rules/tas368-task-completions.test.js\""
   },
