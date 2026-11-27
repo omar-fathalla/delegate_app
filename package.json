@@ -68,7 +68,8 @@
     "test:rules:tas362-attendance-config": "bash scripts/emulators_exec.sh --only firestore --project demo-tas362-config \"node --test test/rules/tas362-attendance-rules-config.test.js\"",
     "test:rules:tas362-forgotten-job": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas362-job \"node --test functions/test/attendance_forgotten.emulator.test.js\"",
     "test:rules:tas361-attendance-callables": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas361b \"node --test functions/test/attendance_callables.emulator.test.js\"",
-    "test:rules:tas368-completions": "bash scripts/emulators_exec.sh --only firestore --project demo-tas368 \"node --test test/rules/tas368-task-completions.test.js\""
+    "test:rules:tas368-completions": "bash scripts/emulators_exec.sh --only firestore --project demo-tas368 \"node --test test/rules/tas368-task-completions.test.js\"",
+    "test:rules:tas369-photos": "bash scripts/emulators_exec.sh --only firestore --project demo-tas369 \"node --test test/rules/tas369-captured-photos-create.test.js\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

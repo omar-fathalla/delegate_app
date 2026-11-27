@@ -2558,6 +2558,30 @@ abstract class AppLocalizations {
   /// **'Your local data is saved first'**
   String get logoutDialogBody;
 
+  /// No description provided for @logoutPendingPhotosWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait! {count} photos are still on this phone. If you sign out now they will not upload until you sign in again with this account.'**
+  String logoutPendingPhotosWarning(int count);
+
+  /// No description provided for @logoutWaitForPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait'**
+  String get logoutWaitForPhotos;
+
+  /// No description provided for @logoutAnyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out anyway'**
+  String get logoutAnyway;
+
+  /// No description provided for @photoSyncFailedRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} photos failed to upload, tap to retry'**
+  String photoSyncFailedRetry(int count);
+
   /// No description provided for @logoutFailed.
   ///
   /// In en, this message translates to:

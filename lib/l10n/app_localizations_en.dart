@@ -1348,6 +1348,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logoutDialogBody => 'Your local data is saved first';
 
   @override
+  String logoutPendingPhotosWarning(int count) {
+    return 'Wait! $count photos are still on this phone. If you sign out now they will not upload until you sign in again with this account.';
+  }
+
+  @override
+  String get logoutWaitForPhotos => 'Wait';
+
+  @override
+  String get logoutAnyway => 'Sign out anyway';
+
+  @override
+  String photoSyncFailedRetry(int count) {
+    return '$count photos failed to upload, tap to retry';
+  }
+
+  @override
   String logoutFailed(Object error) {
     return 'Couldn\'t log out: $error';
   }
