@@ -147,6 +147,11 @@ class DelegateTrackingEngine {
           accuracy: LocationAccuracy.high,
           distanceFilter: 15, // إرسال تحديث عند التحرك 15 متراً
           intervalDuration: const Duration(seconds: 25),
+          // TAS-364 (user decision 2026-11-26, message 4.1): a foreground
+          // service with a fixed notification for the whole shift, so the
+          // location keeps updating with the screen off. Started while the
+          // app is open (check-in), so no ACCESS_BACKGROUND_LOCATION.
+          foregroundNotificationConfig: trackingForegroundNotification(),
         );
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         locationSettings = AppleSettings(
@@ -294,3 +299,14 @@ class DelegateTrackingEngine {
     _lastPingTime = null;
   }
 }
+
+/// TAS-364: the shift notification (message 4.1 in
+/// USER-SCENARIOS/01-delegate-messages.md). Shown while tracking runs and
+/// removed when the session stops (check-out or logout).
+ForegroundNotificationConfig trackingForegroundNotification() =>
+    const ForegroundNotificationConfig(
+      notificationTitle: 'تسهيل: الشيفت شغال',
+      notificationText: 'موقعك بيتسجل لحد الانصراف',
+      enableWakeLock: true,
+      setOngoing: true,
+    );
