@@ -2581,6 +2581,10 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       key: ValueKey('permission_card_${permission.uid}'),
       margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
       clipBehavior: Clip.antiAlias,
+      // TAS-400: keep the branch link and buttons as their own semantics
+      // nodes (a Card merges its children by default, so TalkBack and
+      // Maestro could not reach «N فروع»).
+      semanticContainer: false,
       child: Padding(
         padding: const EdgeInsetsDirectional.fromSTEB(
           TashilSpacing.lg,

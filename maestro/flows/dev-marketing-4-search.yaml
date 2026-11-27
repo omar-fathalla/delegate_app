@@ -1,0 +1,58 @@
+appId: com.tashil.delegate.dev
+---
+# TAS-393 marketing journey 4/5: search. Company by code (Fake Company Alpha
+# is code 9001) → its delegates; delegate by name → profile.
+- runFlow:
+    file: ../subflows/login-marketing.yaml
+
+- runFlow:
+    file: ../subflows/open-main-menu.yaml
+- tapOn: "بحث"
+- extendedWaitUntil:
+    visible: "بحث عن الشركة"
+    timeout: 30000
+
+# Empty company search explains what is missing.
+- tapOn: "بحث عن الشركة"
+- extendedWaitUntil:
+    visible: "يرجى إدخال كود الشركة"
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "يرجى إدخال كود الشركة"
+    timeout: 15000
+
+- tapOn:
+    id: "company_search_code"
+- inputText: "9001"
+- tapOn: "بحث عن الشركة"
+- extendedWaitUntil:
+    visible: ".*Fake Company Alpha.*"
+    timeout: 30000
+- tapOn: ".*Fake Company Alpha.*"
+- extendedWaitUntil:
+    visible: ".*Fake Delegate alpha 1.*"
+    timeout: 30000
+- tapOn: "رجوع|Back"
+
+# Delegate by name.
+- tapOn: "مندوب"
+- tapOn:
+    id: "delegate_search_name"
+- inputText: "Fake Delegate alpha 2"
+- tapOn: "بحث عن المندوب"
+- extendedWaitUntil:
+    visible: ".*Fake Delegate alpha 2.*"
+    timeout: 30000
+- tapOn: ".*Fake Delegate alpha 2.*01000000010.*"
+- extendedWaitUntil:
+    visible: "المستندات(\\n.*)?"
+    timeout: 30000
+- assertVisible: "سجل الطلبات(\\n.*)?"
+- tapOn: "رجوع|Back"
+
+# Clear all results.
+- tapOn: "مسح البحث"
+- extendedWaitUntil:
+    visible: ".*لم يتم البحث بعد.*"
+    timeout: 15000
+- tapOn: "رجوع|Back"
