@@ -43,5 +43,12 @@ appId: com.tashil.delegate.dev
     visible: "الإعدادات"
     timeout: 60000
 
+# TAS-358: the field delegate's Settings has no logout row; the delegate
+# logs out from the navigation menu. Go back to the shell first (TAS-387
+# Mac gate: the flow looked for the row in Settings).
+- tapOn: "رجوع|Back"
+- runFlow:
+    file: ../subflows/wait-for-main-menu-button.yaml
+
 - runFlow:
     file: ../subflows/logout-via-menu.yaml
