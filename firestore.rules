@@ -2970,7 +2970,17 @@ service cloud.firestore {
       allow read: if canReadOwnNotification();
       allow read: if canReadOrgAdminRoleBroadcast();
       allow read: if canReadCompanySupervisorBroadcast();
-      allow read: if canReadNotification();
+      // TAS-413: a delegate token reads its own notifications (above), its
+      // company supervisors' broadcast (above, supervisor delegates) and the
+      // app / delegates / company broadcasts here; anything else (a
+      // colleague's notification) is refused by this rule, not by running
+      // the staff helpers into the 1000-expression budget.
+      function delegateTokenBroadcastTarget() {
+        let t = resource.data.get('delegateUid', '');
+        return t is string && (t in ['all', 'delegates']
+          || t.matches('^(delegates_|company_).+'));
+      }
+      allow read: if (staffToken() || delegateTokenBroadcastTarget()) && canReadNotification();
       allow create: if canCreateNotification();
       // Own notification: the read flags and the caller's soft delete.
       // One update rule (two separate ones ran out of budget together).
