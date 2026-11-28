@@ -51,4 +51,10 @@ void main() {
     // Only for a field delegate / supervisor.
     expect(work, contains('delegate.role != UserRole.delegate'));
   });
+
+  test('TAS-366: «مرتبي» list item for delegate tokens only', () {
+    expect(src, contains("Key('profileMySalaryTile')"));
+    expect(src, contains('if (effectiveDelegate?.role == UserRole.delegate) ...['));
+    expect(src, contains('DelegateMySalaryScreen(delegate: delegate)'));
+  });
 }

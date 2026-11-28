@@ -1262,6 +1262,7 @@
     "description": "Wallets management label"
   },
   "violationsPolicy": "Violations policy",
+  "mySalary": "My salary",
   "myViolations": "My violations",
   "switchOrganization": "Switch organization",
   "manageOrganizationsChains": "Manage organizations and chains",

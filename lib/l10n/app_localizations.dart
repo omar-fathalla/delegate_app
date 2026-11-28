@@ -1844,6 +1844,12 @@ abstract class AppLocalizations {
   /// **'Violations policy'**
   String get violationsPolicy;
 
+  /// No description provided for @mySalary.
+  ///
+  /// In en, this message translates to:
+  /// **'My salary'**
+  String get mySalary;
+
   /// No description provided for @myViolations.
   ///
   /// In en, this message translates to:

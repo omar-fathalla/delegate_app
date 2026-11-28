@@ -938,6 +938,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get violationsPolicy => 'Violations policy';
 
   @override
+  String get mySalary => 'My salary';
+
+  @override
   String get myViolations => 'My violations';
 
   @override

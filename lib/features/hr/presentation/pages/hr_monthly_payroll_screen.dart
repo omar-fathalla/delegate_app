@@ -1,4 +1,3 @@
-import 'package:delegate_app/features/hr/domain/payroll_penalty_policy.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/attendance/domain/missing_check_out_rule.dart';
 import 'package:material_ui/material_ui.dart';
@@ -14,138 +13,11 @@ import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import 'package:delegate_app/features/hr/data/models/company_payroll_config_model.dart';
-import 'package:delegate_app/features/hr/domain/services/payroll_day_rules.dart';
+import 'package:delegate_app/features/hr/domain/services/delegate_payroll_calculator.dart';
 import 'package:delegate_app/features/hr/domain/entities/company_payroll_config.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
-
-/// عنصر مسير الراتب للمندوب متوافق مع كافة أنماط وقواعد الاحتساب
-class _DelegatePayrollItem {
-  final Delegate delegate;
-  int attendedDays;
-  int approvedLeaveDays;
-
-  /// إجازات معتمدة غير مدفوعة (مرضية / طارئة / بدون أجر) — تُخصم كالغياب
-  int unpaidLeaveDays;
-  int absentDays;
-  int elapsedWorkingDays;
-  int totalWorkMinutes;
-
-  // إعدادات الراتب والوردية
-  double baseSalary;
-  double dailyShiftHours;
-  double? customHourlyRate;
-  PayrollCalculationMode calculationMode;
-  int monthTargetWorkingDays;
-
-  // الجزاءات
-  double penaltiesDeductions;
-  List<Map<String, dynamic>> appliedPenalties;
-
-  _DelegatePayrollItem({
-    required this.delegate,
-    this.attendedDays = 0,
-    this.approvedLeaveDays = 0,
-    this.unpaidLeaveDays = 0,
-    this.absentDays = 0,
-    this.elapsedWorkingDays = 0,
-    this.totalWorkMinutes = 0,
-    this.baseSalary = 3500.0,
-    this.dailyShiftHours = 9.0,
-    this.customHourlyRate,
-    this.calculationMode = PayrollCalculationMode.monthlyWithDeductions,
-    this.monthTargetWorkingDays = 26,
-    this.penaltiesDeductions = 0.0,
-    List<Map<String, dynamic>>? appliedPenalties,
-  }) : appliedPenalties = appliedPenalties ?? [];
-
-  /// ساعات العمل الفعلية المنجزة
-  double get actualWorkHours => totalWorkMinutes / 60.0;
-
-  /// إجمالي الساعات المستهدفة للوردية في الشهر
-  double get targetWorkHours => monthTargetWorkingDays * dailyShiftHours;
-
-  /// أجر الساعة الفعلي المعتمد
-  double get effectiveHourlyRate {
-    if (customHourlyRate != null && customHourlyRate! > 0) {
-      return customHourlyRate!;
-    }
-    if (targetWorkHours > 0) {
-      return baseSalary / targetWorkHours;
-    }
-    return baseSalary / (26 * 9.0);
-  }
-
-  /// أجر اليوم الفعلي المعتمد
-  double get effectiveDailyRate => effectiveHourlyRate * dailyShiftHours;
-
-  /// استحقاق ساعات العمل الفعلية
-  double get earnedWorkAmount => actualWorkHours * effectiveHourlyRate;
-
-  /// إجمالي ساعات الإجازات المعتمدة
-  double get leaveHours => approvedLeaveDays * dailyShiftHours;
-
-  /// استحقاق الإجازات المعتمدة (مدفوعة الأجر)
-  double get earnedLeaveAmount => approvedLeaveDays * effectiveDailyRate;
-
-  /// عدد الأيام المستحقة للصرف (أيام الحضور الفعلي + الإجازات الرسمية المعتمدة)
-  int get payableDays {
-    final days = attendedDays + approvedLeaveDays;
-    return days > elapsedWorkingDays ? elapsedWorkingDays : days;
-  }
-
-  /// ساعات النقص الناتجة عن أيام الغياب الفعلية
-  double get shortfallHours => deductibleDays * dailyShiftHours;
-
-  /// الأيام المخصومة = الغياب + الإجازات غير المدفوعة
-  int get deductibleDays => absentDays + unpaidLeaveDays;
-
-  /// قيمة استقطاع أيام الغياب الفعلية (عدد أيام الغياب × أجر اليوم المعتمد)
-  double get absenceDeductionAmount {
-    if (calculationMode == PayrollCalculationMode.hourlyRate) {
-      // في نمط الساعات يتقاضى فقط ما أنجزه بالساعة ولا يوجد استقطاع غياب إضافي
-      return 0.0;
-    }
-    // استقطاع الغياب = عدد أيام الغياب الفعلية × أجر اليوم
-    final deduction = deductibleDays * effectiveDailyRate;
-    return deduction > grossEarned ? grossEarned : deduction;
-  }
-
-  /// إجمالي الاستحقاق للفترة المنقضية قبل الخصومات (Gross)
-  double get grossEarned {
-    if (calculationMode == PayrollCalculationMode.hourlyRate) {
-      return earnedWorkAmount + earnedLeaveAmount;
-    }
-    // في النمط الشهري: استحقاق الفترة المنقضية = أيام العمل المنقضية × أجر اليوم المعتمد
-    final earned = elapsedWorkingDays * effectiveDailyRate;
-    return earned > baseSalary ? baseSalary : earned;
-  }
-
-  /// إجمالي الخصومات (غياب + جزاءات)
-  double get totalDeductions => absenceDeductionAmount + penaltiesDeductions;
-
-  /// صافي المستحق الفعلي للصرف (Net Payout)
-  /// = (أيام الفترة - أيام الغياب) × أجر اليوم - الجزاءات
-  /// = الأيام المستحقة الفعلية × أجر اليوم - الجزاءات
-  double get netSalary {
-    if (calculationMode == PayrollCalculationMode.hourlyRate) {
-      final net = (grossEarned - penaltiesDeductions);
-      return net > 0 ? net : 0.0;
-    } else {
-      // صافي الصرف هو أجر الأيام المستحقة الفعلية ناقص الجزاءات
-      final earnedDaysAmount = payableDays * effectiveDailyRate;
-      final net = (earnedDaysAmount - penaltiesDeductions);
-      return net > 0 ? net : 0.0;
-    }
-  }
-
-  String get formattedTotalHours {
-    final h = totalWorkMinutes ~/ 60;
-    final m = totalWorkMinutes % 60;
-    return '$h س و $m د';
-  }
-}
 
 /// كشف مسير الرواتب الشهري المربوط بساعات العمل والورديات والجزاءات والسياسات الديناميكية
 class HRMonthlyPayrollScreen extends StatefulWidget {
@@ -175,7 +47,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
   String? _errorMessage;
 
   List<Delegate> _companyDelegates = [];
-  List<_DelegatePayrollItem> _payrollItems = [];
+  List<DelegatePayrollItem> _payrollItems = [];
   late CompanyPayrollConfig _companyPayrollConfig;
 
   final TextEditingController _searchController = TextEditingController();
@@ -268,10 +140,6 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         return;
       }
 
-      final monthStart = DateTime(_selectedMonth.year, _selectedMonth.month, 1, 0, 0, 0);
-      final nextMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
-      final monthEnd = nextMonth.subtract(const Duration(seconds: 1));
-
       // 3. Fetch User Wallets for base salary and individual shift overrides
       final walletsSnap = await HRMonthlyPayrollScreen._firestore
           .collection('user_wallets')
@@ -284,7 +152,8 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         walletConfigByDelegateId[doc.id] = doc.data();
       }
 
-      // 4. Fetch Penalties issued in this month
+      // 4. Penalties of the company (status and month are filtered by the
+      // shared calculator, TAS-308 / TAS-366).
       final penaltiesSnap = await HRMonthlyPayrollScreen._firestore
           .collection('penalties')
           .where('companyId', isEqualTo: widget.hrDelegate.companyUID)
@@ -293,198 +162,57 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       final Map<String, List<Map<String, dynamic>>> penaltiesByDelegateId = {};
       for (final doc in penaltiesSnap.docs) {
         final data = doc.data();
-        // TAS-308: stored statuses are ISSUED / ACKNOWLEDGED / DEDUCTED.
-        if (isPayrollDeductiblePenaltyStatus(data['status'])) {
-          final ts = data['createdAt'];
-          if (ts is Timestamp) {
-            final pDate = ts.toDate();
-            if (pDate.isBefore(monthStart) || pDate.isAfter(monthEnd)) {
-              continue;
-            }
-          }
-          final delId = (data['targetDelegateId'] ?? '').toString();
-          if (delId.isNotEmpty) {
-            penaltiesByDelegateId.putIfAbsent(delId, () => []).add(data);
-          }
+        final delId = (data['targetDelegateId'] ?? '').toString();
+        if (delId.isNotEmpty) {
+          penaltiesByDelegateId.putIfAbsent(delId, () => []).add(data);
         }
       }
 
-      // 5. Fetch Approved Leaves in this month
+      // 5. Approved leaves of the company
       final leavesSnap = await HRMonthlyPayrollScreen._firestore
           .collection('leave_requests')
           .where('companyUID', isEqualTo: widget.hrDelegate.companyUID)
           .where('status', isEqualTo: 'approved')
           .get();
 
-      // السنوية تُدفع في حدود الرصيد؛ المرضية/الطارئة/بدون أجر غير مدفوعة؛ التأخير/الانصراف المبكر لا تُحتسب
-      final Map<String, int> unpaidLeaveDaysByDelegateId = {};
-      final Map<String, int> annualDaysThisMonth = {};
-      final Map<String, int> annualDaysEarlierThisYear = {};
-      final yearStart = DateTime(monthStart.year);
+      final Map<String, List<Map<String, dynamic>>> leavesByDelegateId = {};
       for (final doc in leavesSnap.docs) {
         final data = doc.data();
         final delId = (data['delegateUid'] ?? '').toString();
         if (delId.isEmpty) continue;
-        final days = (data['daysCount'] as num?)?.toInt() ?? 1;
-        final sTs = data['startDate'];
-        final sDate = sTs is Timestamp ? sTs.toDate() : null;
-        final inMonth = sDate == null || !(sDate.isBefore(monthStart) || sDate.isAfter(monthEnd));
-        final category = PayrollDayRules.categorize(data);
-        if (category == PayrollLeaveCategory.notALeaveDay) continue;
-        if (category == PayrollLeaveCategory.annual) {
-          if (inMonth) {
-            annualDaysThisMonth[delId] = (annualDaysThisMonth[delId] ?? 0) + days;
-          } else if (!sDate.isBefore(yearStart) && sDate.isBefore(monthStart)) {
-            annualDaysEarlierThisYear[delId] = (annualDaysEarlierThisYear[delId] ?? 0) + days;
-          }
-          continue;
-        }
-        if (!inMonth) continue;
-        unpaidLeaveDaysByDelegateId[delId] = (unpaidLeaveDaysByDelegateId[delId] ?? 0) + days;
+        leavesByDelegateId.putIfAbsent(delId, () => []).add(data);
       }
 
-      // 6. Fetch Attendance logs for the month
+      // 6. Attendance logs of the company
       final attendanceSnap = await HRMonthlyPayrollScreen._firestore
           .collection(kAttendanceCollection)
           .where('companyId', isEqualTo: widget.hrDelegate.companyUID)
           .get();
 
-      final Map<String, Map<String, List<Map<String, dynamic>>>> attendanceByDelegateAndDay = {};
+      final Map<String, List<Map<String, dynamic>>> attendanceByDelegateId = {};
       for (final doc in attendanceSnap.docs) {
         final data = doc.data();
-        final ts = data['timestamp'];
-        if (ts is Timestamp) {
-          final date = ts.toDate();
-          if (date.isBefore(monthStart) || date.isAfter(monthEnd)) continue;
-          final delId = (data['delegateId'] ?? data['userId'] ?? '').toString();
-          if (delId.isEmpty) continue;
-
-          final dateKey = DateFormat('yyyy-MM-dd').format(date);
-          attendanceByDelegateAndDay
-              .putIfAbsent(delId, () => {})
-              .putIfAbsent(dateKey, () => [])
-              .add(data);
-        }
+        final delId = (data['delegateId'] ?? data['userId'] ?? '').toString();
+        if (delId.isEmpty) continue;
+        attendanceByDelegateId.putIfAbsent(delId, () => []).add(data);
       }
 
-      // 7. Build Payroll Items
+      // 7. Build payroll items with the calculator the delegate's «مرتبي»
+      // screen uses too (TAS-366), so both show the same net.
       final now = DateTime.now();
-      final isCurrentMonth = _selectedMonth.year == now.year && _selectedMonth.month == now.month;
-      final isFutureMonth = _selectedMonth.isAfter(DateTime(now.year, now.month));
-
-      // حساب عدد أيام العمل الفعلية المعتمدة حتى تاريخ التقييم (باستثناء أيام الجمعة كعطلات رسمية)
-      int elapsedWorkingDays = 0;
-      if (!isFutureMonth) {
-        final int lastDayToEvaluate = isCurrentMonth
-            ? now.day
-            : nextMonth.subtract(const Duration(days: 1)).day;
-
-        for (int day = 1; day <= lastDayToEvaluate; day++) {
-          final dt = DateTime(_selectedMonth.year, _selectedMonth.month, day);
-          // الجمعة عطلة أسبوعية رسمية لا تحتسب يوم عمل مطلوب للغياب
-          if (dt.weekday != DateTime.friday) {
-            elapsedWorkingDays++;
-          }
-        }
-        if (elapsedWorkingDays > _companyPayrollConfig.defaultMonthlyWorkingDays) {
-          elapsedWorkingDays = _companyPayrollConfig.defaultMonthlyWorkingDays;
-        }
-      }
-
-      final List<_DelegatePayrollItem> items = [];
-
-      for (final d in _companyDelegates) {
-        final daysMap = attendanceByDelegateAndDay[d.uid] ?? {};
-        int attendedDaysCount = 0;
-        int totalMins = 0;
-        final walletData = walletConfigByDelegateId[d.uid] ?? {};
-        final delegateShiftHours = (walletData['dailyShiftHours'] as num?)?.toDouble() ??
-            _companyPayrollConfig.defaultDailyShiftHours;
-
-        for (final logs in daysMap.values) {
-          DateTime? inTime;
-          DateTime? outTime;
-          // TAS-362: a forgotten session counts zero (from the rule date).
-          final forgottenFlag = MissingCheckOutRule.flaggedIn(logs);
-          final manuallyAdjusted = MissingCheckOutRule.adjustedIn(logs);
-          for (final log in logs) {
-            final type = log['type']?.toString();
-            final ts = log['timestamp'];
-            DateTime? t;
-            if (ts is Timestamp) t = ts.toDate();
-
-            if (type == 'check_in') {
-              if (inTime == null || (t != null && t.isBefore(inTime))) inTime = t;
-            } else if (type == 'check_out') {
-              if (outTime == null || (t != null && t.isAfter(outTime))) outTime = t;
-            }
-          }
-
-          if (inTime != null) {
-            attendedDaysCount++;
-            // الأقل من (الفعلي، الوردية المحددة) — بدون أوفر تايم، واليوم المغلق تلقائياً = الوردية
-            totalMins += PayrollDayRules.paidMinutesForDay(
-              checkIn: inTime,
-              checkOut: outTime,
-              now: now,
-              shiftHours: delegateShiftHours,
-              forgottenFlag: forgottenFlag,
-              manuallyAdjusted: manuallyAdjusted,
-            );
-          }
-        }
-
-        final paidAnnualDays = PayrollDayRules.paidAnnualLeaveDays(
-          annualLeaveEnabled: d.isAnnualLeaveEnabled,
-          annualQuota: d.annualLeaveQuota,
-          usedEarlierThisYear: annualDaysEarlierThisYear[d.uid] ?? 0,
-          requestedThisMonth: annualDaysThisMonth[d.uid] ?? 0,
-        );
-        final leaveDays = paidAnnualDays;
-        final unpaidLeaveDays =
-            (unpaidLeaveDaysByDelegateId[d.uid] ?? 0).clamp(0, (elapsedWorkingDays - attendedDaysCount - leaveDays).clamp(0, elapsedWorkingDays));
-        final absent = (elapsedWorkingDays - attendedDaysCount - leaveDays - unpaidLeaveDays).clamp(0, elapsedWorkingDays);
-
-        // Configuration resolution (Custom Wallet Override vs Company Policy)
-        final alloc = (walletData['monthlyAllocation'] as num?)?.toDouble() ?? 0.0;
-        final base = (walletData['baseSalary'] as num?)?.toDouble() ?? 0.0;
-        final delegateBaseSalary = alloc > 0
-            ? alloc
-            : (base > 0 ? base : _companyPayrollConfig.defaultMonthlyBaseSalary);
-
-        final customRate = (walletData['customHourlyRate'] as num?)?.toDouble();
-
-        final modeCode = walletData['payrollCalculationMode']?.toString();
-        final delegateMode = modeCode != null
-            ? PayrollCalculationModeExt.fromCode(modeCode)
-            : _companyPayrollConfig.calculationMode;
-
-        // Penalties sum
-        final delegatePenalties = penaltiesByDelegateId[d.uid] ?? [];
-        double totalPenalties = 0.0;
-        for (final p in delegatePenalties) {
-          totalPenalties += (p['fineAmount'] as num?)?.toDouble() ?? 0.0;
-        }
-
-        items.add(
-          _DelegatePayrollItem(
+      final List<DelegatePayrollItem> items = [
+        for (final d in _companyDelegates)
+          DelegatePayrollCalculator.compute(
             delegate: d,
-            attendedDays: attendedDaysCount,
-            approvedLeaveDays: leaveDays,
-            unpaidLeaveDays: unpaidLeaveDays,
-            absentDays: absent,
-            elapsedWorkingDays: elapsedWorkingDays,
-            totalWorkMinutes: totalMins,
-            baseSalary: delegateBaseSalary,
-            dailyShiftHours: delegateShiftHours,
-            customHourlyRate: customRate,
-            calculationMode: delegateMode,
-            monthTargetWorkingDays: _companyPayrollConfig.defaultMonthlyWorkingDays,
-            penaltiesDeductions: totalPenalties,
-            appliedPenalties: delegatePenalties,
+            config: _companyPayrollConfig,
+            wallet: walletConfigByDelegateId[d.uid] ?? const {},
+            attendance: attendanceByDelegateId[d.uid] ?? const [],
+            leaves: leavesByDelegateId[d.uid] ?? const [],
+            penalties: penaltiesByDelegateId[d.uid] ?? const [],
+            month: _selectedMonth,
+            now: now,
           ),
-        );
-      }
+      ];
 
       // Sort by delegate full name
       items.sort((a, b) => a.delegate.fullName.compareTo(b.delegate.fullName));
@@ -505,7 +233,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     }
   }
 
-  List<_DelegatePayrollItem> get _filteredPayrollItems {
+  List<DelegatePayrollItem> get _filteredPayrollItems {
     if (_searchQuery.isEmpty) return _payrollItems;
     final q = _searchQuery.toLowerCase();
     return _payrollItems.where((item) {
@@ -647,7 +375,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
   }
 
   /// نافذة تعديل راتب وساعات العمل لمندوب بعينه
-  void _openDelegateSalaryDialog(_DelegatePayrollItem item) {
+  void _openDelegateSalaryDialog(DelegatePayrollItem item) {
     final isWide = MediaQuery.of(context).size.width > 768;
 
     if (!isWide) {
@@ -690,7 +418,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
   }
 
   Future<void> _saveDelegateSalary(
-    _DelegatePayrollItem item,
+    DelegatePayrollItem item,
     double baseSal,
     double shiftH,
     double? customRate,
@@ -1228,7 +956,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
 
   // ── Web layout (TAS-119) ──────────────────────────────────────────────
   // Presentation only: every number below comes from the same
-  // _DelegatePayrollItem getters the mobile layout and the export use.
+  // DelegatePayrollItem getters the mobile layout and the export use.
 
   static final NumberFormat _webMoneyFormat = NumberFormat('#,##0', 'en');
 
@@ -1264,7 +992,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     if (picked != null) _changeMonth(DateTime(picked.year, picked.month, 1));
   }
 
-  Widget _buildWebBody(BuildContext context, List<_DelegatePayrollItem> filtered) {
+  Widget _buildWebBody(BuildContext context, List<DelegatePayrollItem> filtered) {
     return ListView(
       key: const Key('payroll_web_body'),
       padding: const EdgeInsets.all(16),
@@ -1430,7 +1158,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
   }
 
   /// Four month totals for the filtered list.
-  Widget _buildWebSummary(BuildContext context, List<_DelegatePayrollItem> filtered) {
+  Widget _buildWebSummary(BuildContext context, List<DelegatePayrollItem> filtered) {
     final colorScheme = Theme.of(context).colorScheme;
     final status = HrStatusColors.of(context);
 
@@ -1491,7 +1219,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     );
   }
 
-  Widget _buildWebTable(BuildContext context, List<_DelegatePayrollItem> filtered) {
+  Widget _buildWebTable(BuildContext context, List<DelegatePayrollItem> filtered) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final status = HrStatusColors.of(context);
@@ -1505,7 +1233,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
           ),
         );
 
-    Widget row(_DelegatePayrollItem item) {
+    Widget row(DelegatePayrollItem item) {
       final d = item.delegate;
       final position = d.position == DelegatePosition.supervisor ? 'مشرف' : 'مندوب / مروج';
       final hasDeductions = item.totalDeductions > 0;
@@ -1894,7 +1622,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     );
   }
 
-  void _showEmployeePayrollDetail(_DelegatePayrollItem item) {
+  void _showEmployeePayrollDetail(DelegatePayrollItem item) {
     final isWide = MediaQuery.of(context).size.width > 768;
 
     if (!isWide) {
@@ -2521,7 +2249,7 @@ class _CompanyPayrollPolicySheetState
 
 /// ورقة تعديل راتب وساعات المندوب بنمط M3 مع مجموعة الأزرار المترابطة
 class _DelegateSalarySheet extends StatefulWidget {
-  final _DelegatePayrollItem item;
+  final DelegatePayrollItem item;
   final Delegate hrDelegate;
   final bool isBottomSheet;
   final Future<void> Function(
@@ -2927,7 +2655,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
 
 /// ورقة تفاصيل مسير راتب المندوب بنمط M3 فخم ومنسق بالكامل مع بطاقات وأيقونات جوجل
 class _EmployeePayrollDetailSheet extends StatelessWidget {
-  final _DelegatePayrollItem item;
+  final DelegatePayrollItem item;
   final bool isBottomSheet;
   final VoidCallback onEditSalary;
 
