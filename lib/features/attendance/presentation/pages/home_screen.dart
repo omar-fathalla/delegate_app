@@ -253,12 +253,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     // Same fallback chain as the attendance screen (TAS-278).
-    final fix = await AttendanceLocationFetcher().fetch();
+    final fetcher = AttendanceLocationFetcher();
+    final fix = await fetcher.fetch();
     if (fix == null) {
       if (context.mounted) {
+        // TAS-396: same weak-signal / no-fix messages as the attendance
+        // screen.
         AppSnackBar.showError(
           context,
-          AppLocalizations.of(context)!.locationTimeout,
+          locationFailureMessage(
+            AppLocalizations.of(context)!,
+            fetcher.lastFailure,
+          ),
         );
       }
       return null;

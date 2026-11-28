@@ -3386,6 +3386,22 @@ class AppLocalizationsAr extends AppLocalizations {
       'لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع وجرّب تاني.';
 
   @override
+  String get locationWeakSignal =>
+      'الموقع مش واضح: الإشارة ضعيفة جوه المكان. اطلع جنب الباب أو شباك دقيقة وجرّب تاني.';
+
+  @override
+  String get locHelpReasonWeakSignal =>
+      'الموقع مش واضح: الإشارة ضعيفة جوه المكان. اطلع جنب الباب أو شباك دقيقة وجرّب تاني.';
+
+  @override
+  String get locHelpReasonNoFix =>
+      'مقدرناش نعرف موقعك. اقف في مكان مفتوح دقيقة وجرّب تاني.';
+
+  @override
+  String get attWeakSignalNearBranch =>
+      'الموقع مش واضح، فمش متأكدين إنك جوه الفرع. اطلع جنب الباب أو شباك دقيقة وجرّب تاني.';
+
+  @override
   String attBranchOtherChain(String chain) {
     return 'الفرع ده تبع سلسلة $chain. بدّل للسلسلة دي الأول وبعدين جرّب تاني.';
   }
