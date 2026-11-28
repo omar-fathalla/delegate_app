@@ -1,5 +1,4 @@
 import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -13,6 +12,8 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.d
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
 import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evidence_viewer.dart';
+import 'package:delegate_app/features/penalties/presentation/widgets/penalty_response_panel.dart';
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/features/penalties/presentation/utils/penalty_creator_helper.dart';
 import 'package:delegate_app/features/penalties/presentation/utils/penalty_list_scope.dart';
 import 'admin_create_penalty_page.dart';
@@ -1119,6 +1120,9 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                     ),
                   );
                   _loadData();
+                } else if (state is PenaltyActionFailedState) {
+                  // TAS-365: a refused dispute decision; the list stays.
+                  showTashilSnackBar(context, state.message);
                 } else if (state is PenaltyErrorState) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -1132,6 +1136,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                   );
                 }
               },
+              buildWhen: (_, state) => state is! PenaltyActionFailedState,
               builder: (context, state) {
                 if (state is PenaltyLoadingState) {
                   return const Center(child: CircularProgressIndicator());
@@ -1856,7 +1861,9 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
         ((widget.currentDelegate.role == UserRole.organizationAdmin ||
                 widget.currentDelegate.role == UserRole.superAdmin ||
                 widget.currentDelegate.role == UserRole.technicalSupport) &&
-            widget.penalty.status == PenaltyStatus.pendingGeneralManager);
+            widget.penalty.status == PenaltyStatus.pendingGeneralManager) ||
+        (PenaltyResponsePanel.isDecider(widget.currentDelegate) &&
+            widget.penalty.status == PenaltyStatus.disputed);
     _isExpanded = requiresAction;
   }
 
@@ -2444,7 +2451,14 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                           ),
                           tooltip: 'تغيير حالة المخالفة',
                           onSelected: widget.onStatusChanged,
-                          itemBuilder: (context) => PenaltyStatus.values.map((st) {
+                          // TAS-365: ACKNOWLEDGED / DISPUTED are the delegate's
+                          // moves (respondToPenalty); a dispute is decided below.
+                          enabled: widget.penalty.status != PenaltyStatus.disputed,
+                          itemBuilder: (context) => PenaltyStatus.values
+                              .where((st) =>
+                                  st != PenaltyStatus.acknowledged &&
+                                  st != PenaltyStatus.disputed)
+                              .map((st) {
                             return PopupMenuItem(
                               value: st,
                               child: Text(st.displayName, style: const TextStyle(fontSize: 12.5)),
@@ -2549,6 +2563,12 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
                         ),
                       ),
                   ],
+                ),
+
+                // TAS-365: the dispute and its decision (super admin, chain admin).
+                PenaltyResponsePanel(
+                  penalty: widget.penalty,
+                  currentDelegate: widget.isReadOnly ? null : widget.currentDelegate,
                 ),
 
                 // Approvals by Branches Marketing Manager

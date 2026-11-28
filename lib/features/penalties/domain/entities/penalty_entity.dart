@@ -220,6 +220,22 @@ class PenaltyEntity extends Equatable {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// TAS-365: when the penalty reached ISSUED (server-stamped). The dispute
+  /// window ([disputeWindowDays]) counts from it.
+  final DateTime? issuedAt;
+
+  /// TAS-365: the delegate's dispute, and the decision on it.
+  final String? disputeReason;
+  final DateTime? disputedAt;
+
+  /// `upheld` (back to ISSUED, deducted in [deductionMonth]) or `cancelled`.
+  final String? disputeResolution;
+  final String? disputeResolutionReason;
+  final String? disputeResolvedByName;
+
+  /// TAS-365: payroll month ("YYYY-MM") of a penalty upheld after a dispute.
+  final String? deductionMonth;
+
   const PenaltyEntity({
     required this.penaltyId,
     required this.companyId,
@@ -248,7 +264,37 @@ class PenaltyEntity extends Equatable {
     this.isConfidential = false,
     required this.createdAt,
     required this.updatedAt,
+    this.issuedAt,
+    this.disputeReason,
+    this.disputedAt,
+    this.disputeResolution,
+    this.disputeResolutionReason,
+    this.disputeResolvedByName,
+    this.deductionMonth,
   });
+
+  /// TAS-365 (user decision 2026-11-27): the delegate may dispute within 3
+  /// days of issue. Same number as DISPUTE_WINDOW_DAYS in the functions.
+  static const int disputeWindowDays = 3;
+
+  /// When the dispute window started: issuedAt, else the final approval,
+  /// else creation (old docs). Same order as the server.
+  DateTime get disputeWindowStart =>
+      issuedAt ?? generalManagerApprovedAt ?? createdAt;
+
+  /// The delegate already disputed this penalty once.
+  bool get wasDisputed =>
+      status == PenaltyStatus.disputed ||
+      disputedAt != null ||
+      (disputeResolution ?? '').isNotEmpty;
+
+  /// The delegate can still dispute (the server checks again).
+  bool canDisputeAt(DateTime now) =>
+      (status == PenaltyStatus.issued ||
+          status == PenaltyStatus.acknowledged) &&
+      !wasDisputed &&
+      now.isBefore(
+          disputeWindowStart.add(const Duration(days: disputeWindowDays)));
 
   @override
   List<Object?> get props => [
@@ -279,6 +325,13 @@ class PenaltyEntity extends Equatable {
         isConfidential,
         createdAt,
         updatedAt,
+        issuedAt,
+        disputeReason,
+        disputedAt,
+        disputeResolution,
+        disputeResolutionReason,
+        disputeResolvedByName,
+        deductionMonth,
       ];
 }
 

@@ -33,6 +33,43 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
     on<UpdatePenaltyRequestedEvent>(_onUpdatePenaltyRequested);
     on<UpdatePenaltyStatusEvent>(_onUpdatePenaltyStatus);
     on<DeletePenaltyEvent>(_onDeletePenalty);
+    on<RespondToPenaltyEvent>(_onRespondToPenalty);
+  }
+
+  /// TAS-365: messages 8.2 / 8.4 in USER-SCENARIOS/01-delegate-messages.md.
+  static String respondSuccessMessage(PenaltyResponseAction action) {
+    switch (action) {
+      case PenaltyResponseAction.acknowledge:
+        return 'تمام، اتسجل إنك اطلعت على الجزاء.';
+      case PenaltyResponseAction.dispute:
+        return 'اعتراضك اتبعت: الجزاء مش هيتخصم لحد ما الإدارة ترد.';
+      case PenaltyResponseAction.upholdDispute:
+        return 'اتسجل القرار: الجزاء هيتخصم في مرتب الشهر ده، والمندوب هيوصله إشعار.';
+      case PenaltyResponseAction.cancelPenalty:
+        return 'اتسجل القرار: الجزاء اتلغى، والمندوب هيوصله إشعار.';
+    }
+  }
+
+  Future<void> _onRespondToPenalty(
+    RespondToPenaltyEvent event,
+    Emitter<PenaltyState> emit,
+  ) async {
+    final (action, decision) = switch (event.action) {
+      PenaltyResponseAction.acknowledge => ('acknowledge', null),
+      PenaltyResponseAction.dispute => ('dispute', null),
+      PenaltyResponseAction.upholdDispute => ('resolve', 'uphold'),
+      PenaltyResponseAction.cancelPenalty => ('resolve', 'cancel'),
+    };
+    final result = await repository.respondToPenalty(
+      penaltyId: event.penaltyId,
+      action: action,
+      reason: event.reason,
+      decision: decision,
+    );
+    result.fold(
+      (failure) => emit(PenaltyActionFailedState(failure.message)),
+      (_) => emit(PenaltyActionSuccessState(respondSuccessMessage(event.action))),
+    );
   }
 
   Future<void> _onLoadDelegatePenalties(

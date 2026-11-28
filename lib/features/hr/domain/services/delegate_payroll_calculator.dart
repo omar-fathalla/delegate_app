@@ -181,9 +181,15 @@ abstract final class DelegatePayrollCalculator {
 
   /// The date that decides which month a penalty is deducted in.
   ///
-  /// Today: `createdAt` (TAS-308). TAS-365 will add `deductionMonth`; that
-  /// change belongs here only, so both screens follow it.
+  /// TAS-365: a penalty upheld after a dispute carries `deductionMonth`
+  /// ("YYYY-MM", the decision month) and is deducted in that month. Every
+  /// other penalty uses `createdAt` (TAS-308). Both screens follow this.
   static DateTime? penaltyPayrollDate(Map<String, dynamic> penalty) {
+    final dm = (penalty['deductionMonth'] ?? '').toString().trim();
+    final m = RegExp(r'^(\d{4})-(\d{2})$').firstMatch(dm);
+    if (m != null) {
+      return DateTime(int.parse(m.group(1)!), int.parse(m.group(2)!), 1);
+    }
     final ts = penalty['createdAt'];
     return ts is Timestamp ? ts.toDate() : null;
   }
