@@ -72,6 +72,7 @@ import 'package:delegate_app/features/auth/domain/usecases/cache_all_delegates.d
 import 'package:delegate_app/features/attendance/data/repositories/attendance_repository_impl.dart';
 import 'package:delegate_app/features/attendance/domain/repositories/attendance_repository.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
+import 'package:delegate_app/features/attendance/data/datasources/offline_branch_cache.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
@@ -130,6 +131,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/features/feedback/feedback_injection.dart';
 import 'package:delegate_app/features/private_label/private_label_injection.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
+import 'package:delegate_app/core/services/trusted_time_anchor.dart';
 import 'package:delegate_app/core/services/subscription_promo_config.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/core/utils/promo_clock_binding.dart';
@@ -299,6 +301,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       remoteDataSource: sl(),
       localDataSource: sl(),
       offlineQueue: sl(),
+      branchCache: sl(),
     ),
   );
 
@@ -308,6 +311,9 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   );
   sl.registerLazySingleton<AttendanceOfflineQueue>(
     () => AttendanceOfflineQueueImpl(sharedPreferences: sl()),
+  );
+  sl.registerLazySingleton<OfflineBranchCache>(
+    () => OfflineBranchCache(sl<SharedPreferences>()),
   );
   sl.registerLazySingleton<AttendanceRemoteDataSource>(
     () => AttendanceRemoteDataSourceImpl(
@@ -653,7 +659,10 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
 
   // Trusted Time Service
   sl.registerLazySingleton<TrustedTimeService>(
-    () => TrustedTimeService(firestore: sl()),
+    () => TrustedTimeService(
+      firestore: sl(),
+      anchorStore: TrustedTimeAnchorStore(sl<SharedPreferences>()),
+    ),
   );
 
   // Delegate Tracking Service

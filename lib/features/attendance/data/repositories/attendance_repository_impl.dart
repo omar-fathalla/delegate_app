@@ -13,20 +13,57 @@ import 'package:delegate_app/core/attendance/attendance_branch_ref.dart';
 import 'package:delegate_app/core/attendance/attendance_branch_resolve.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:delegate_app/core/services/trusted_time_anchor.dart';
+import 'package:delegate_app/core/services/trusted_time_service.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_server_api.dart';
+import 'package:delegate_app/features/attendance/data/datasources/offline_branch_cache.dart';
+import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
+import 'package:delegate_app/injection_container.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:uuid/uuid.dart';
 
 class AttendanceRepositoryImpl implements AttendanceRepository {
   final AttendanceRemoteDataSource remoteDataSource;
   final AttendanceLocalDataSource localDataSource;
   final AttendanceOfflineQueue offlineQueue;
 
+  /// TAS-363: branch coordinates for the geofence without network.
+  final OfflineBranchCache? branchCache;
+
+  final OfflineTimeCapture Function()? _captureTime;
+  final Future<bool> Function()? _connectionCheck;
+  final String Function() _newId;
+
   AttendanceRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
     required this.offlineQueue,
-  });
+    this.branchCache,
+    OfflineTimeCapture Function()? captureTime,
+    Future<bool> Function()? hasConnection,
+    String Function()? newId,
+  }) : _captureTime = captureTime,
+       _connectionCheck = hasConnection,
+       _newId = newId ?? (() => const Uuid().v4());
+
+  OfflineTimeCapture _offlineTime() {
+    final capture = _captureTime;
+    if (capture != null) return capture();
+    try {
+      if (sl.isRegistered<TrustedTimeService>()) {
+        return sl<TrustedTimeService>().captureOfflineTime();
+      }
+    } catch (_) {}
+    return OfflineTimeCapture(
+      atMs: DateTime.now().millisecondsSinceEpoch,
+      trusted: false,
+      issue: OfflineTimeIssue.noSync,
+    );
+  }
 
   Future<bool> _hasConnection() async {
+    final check = _connectionCheck;
+    if (check != null) return check();
     try {
       final result = await Connectivity().checkConnectivity();
       return !result.contains(ConnectivityResult.none);
@@ -58,6 +95,18 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       resolved.data,
       documentId: resolved.documentId,
     );
+    try {
+      await branchCache?.save(
+        branchRef.branchOrganizationUID,
+        branch.id.trim().isNotEmpty ? branch.id : branchRef.branchId,
+        CachedBranchLocation(
+          branchName: branchRef.branchName,
+          latitude: branch.latitude,
+          longitude: branch.longitude,
+          geofenceRadius: branch.geofenceRadius,
+        ),
+      );
+    } catch (_) {}
 
     if (branch.latitude == 0.0 && branch.longitude == 0.0) {
       throw ServerFailure(
@@ -106,9 +155,34 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     String? companyName,
     String? personalPhotoURL,
   }) async {
+    final offlineArgs = _OfflineCheckInArgs(
+      userId: userId,
+      lat: lat,
+      long: long,
+      companyId: companyId,
+      organizationId: organizationId,
+      deviceInfo: deviceInfo,
+      branchName: branchName,
+      branchId: branchId,
+      branchOrganizationUID: branchOrganizationUID,
+      delegateName: delegateName,
+      phoneNumber: phoneNumber,
+      companyName: companyName,
+      personalPhotoURL: personalPhotoURL,
+    );
     try {
+      // TAS-363: without network the check-in is saved on the phone and
+      // sent through delegateCheckIn when the network is back.
       if (!await _hasConnection()) {
-        throw const ServerFailure(kCheckInOfflineMessage);
+        return Right(await _saveOfflineCheckIn(offlineArgs));
+      }
+      // A check-in saved offline and not sent yet must go first, or the
+      // server would see no open session.
+      if (offlineQueue.pendingCount(userId) > 0) {
+        await syncPendingAttendance(userId: userId);
+        if (offlineQueue.pending(userId).any((a) => a.isCheckIn)) {
+          return Right(await _saveOfflineCheckIn(offlineArgs));
+        }
       }
 
       // --- Anti-Fraud Geofencing ---
@@ -145,9 +219,220 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       await localDataSource.cacheAttendance(result, organizationId, userId);
       return Right(result);
     } on Failure catch (e) {
+      // The server could not be reached before anything was written: save
+      // it on the phone instead (TAS-363).
+      if (e.message == kCheckInOfflineMessage) {
+        try {
+          return Right(await _saveOfflineCheckIn(offlineArgs));
+        } on Failure catch (offlineFailure) {
+          return Left(offlineFailure);
+        }
+      }
       return Left(e);
     }
   }
+
+  /// TAS-363: geofence on the saved branch coordinates, trusted time, then
+  /// the queue. The server re-checks everything when it is sent.
+  Future<AttendanceModel> _saveOfflineCheckIn(_OfflineCheckInArgs a) async {
+    final name = a.branchName?.trim() ?? '';
+    final ref = AttendanceBranchRef(
+      branchId: a.branchId,
+      branchOrganizationUID: (a.branchOrganizationUID ?? a.organizationId)
+          .trim(),
+      branchName: name,
+    );
+    final loc = name.isEmpty && (a.branchId ?? '').isEmpty
+        ? null
+        : branchCache?.find(ref);
+    final branchId = (a.branchId?.trim().isNotEmpty == true)
+        ? a.branchId!.trim()
+        : loc?.branchId;
+    if (loc == null ||
+        !loc.hasCoordinates ||
+        branchId == null ||
+        branchId.isEmpty) {
+      throw const ServerFailure(kOfflineBranchUnknownMessage);
+    }
+    final distance = Geolocator.distanceBetween(
+      a.lat,
+      a.long,
+      loc.latitude,
+      loc.longitude,
+    );
+    final allowed = loc.geofenceRadius + 50.0;
+    if (distance > allowed) {
+      throw ServerFailure(
+        'أنت خارج نطاق الفرع (${distance.toInt()} متر). '
+        'النطاق المسموح: ${allowed.toInt()} متر لـتسجيل الحضور.',
+      );
+    }
+    final pending = offlineQueue.pending(a.userId);
+    final closed = pending
+        .where((p) => !p.isCheckIn)
+        .map((p) => p.attendanceId)
+        .toSet();
+    if (pending.any((p) => p.isCheckIn && !closed.contains(p.id))) {
+      throw const ServerFailure(kOfflineOpenSessionMessage);
+    }
+
+    final time = _offlineTime();
+    final id = _newId();
+    String? trimmed(String? v) =>
+        (v == null || v.trim().isEmpty) ? null : v.trim();
+    await offlineQueue.add(
+      OfflineAttendanceAction(
+        id: id,
+        kind: OfflineAttendanceAction.checkInKind,
+        delegateId: a.userId,
+        attendanceId: id,
+        lat: a.lat,
+        lng: a.long,
+        capturedAtMs: time.atMs,
+        timeTrusted: time.trusted,
+        syncedAtMs: time.syncedAtMs,
+        checkIn: {
+          'organizationId': a.organizationId,
+          'companyId': a.companyId,
+          'branchId': branchId,
+          'branchOrganizationUID': ref.branchOrganizationUID,
+          'branchName': name,
+          'deviceInfo': a.deviceInfo,
+          'delegateName': ?trimmed(a.delegateName),
+          'phoneNumber': ?trimmed(a.phoneNumber),
+          'companyName': ?trimmed(a.companyName),
+          'personalPhotoURL': ?trimmed(a.personalPhotoURL),
+        },
+      ),
+    );
+    return AttendanceModel(
+      id: id,
+      userId: a.userId,
+      organizationId: a.organizationId,
+      checkInTime: time.at,
+      latitude: a.lat,
+      longitude: a.long,
+      branchName: name,
+      branchId: branchId,
+      branchOrganizationUID: ref.branchOrganizationUID,
+      isSynced: false,
+    );
+  }
+
+  /// TAS-363: check-out saved on the phone, linked to its check-in id (an
+  /// online one, or an offline one still queued). Never refused for the
+  /// distance (same as the server).
+  Future<AttendanceModel> _saveOfflineCheckOut({
+    required String attendanceId,
+    required String userId,
+    required String organizationId,
+    required double lat,
+    required double long,
+  }) async {
+    if (userId.trim().isEmpty) {
+      throw const ServerFailure(kCheckOutOfflineMessage);
+    }
+    final pending = offlineQueue.pending(userId);
+    final outId = '${attendanceId}_out';
+    final already = pending.where((p) => p.id == outId).firstOrNull;
+    final time = already == null ? _offlineTime() : null;
+    if (already == null) {
+      await offlineQueue.add(
+        OfflineAttendanceAction(
+          id: outId,
+          kind: OfflineAttendanceAction.checkOutKind,
+          delegateId: userId,
+          attendanceId: attendanceId,
+          lat: lat,
+          lng: long,
+          capturedAtMs: time!.atMs,
+          timeTrusted: time.trusted,
+          syncedAtMs: time.syncedAtMs,
+        ),
+      );
+    }
+    final outAt = already?.capturedAt ?? time!.at;
+    final queuedIn = pending
+        .where((p) => p.isCheckIn && p.id == attendanceId)
+        .firstOrNull;
+    if (queuedIn != null) {
+      return _queuedCheckInModel(queuedIn).copyWith(checkOutTime: outAt);
+    }
+    Attendance? known;
+    try {
+      final cached = await localDataSource.getLastAttendanceHistory(
+        null,
+        userId,
+      );
+      known = cached.where((c) => c.id == attendanceId).firstOrNull;
+    } catch (_) {}
+    return AttendanceModel(
+      id: attendanceId,
+      userId: userId,
+      organizationId: organizationId,
+      checkInTime: known?.checkInTime ?? outAt,
+      checkOutTime: outAt,
+      latitude: known?.latitude ?? lat,
+      longitude: known?.longitude ?? long,
+      branchName: known?.branchName,
+      branchId: known?.branchId,
+      branchOrganizationUID: known?.branchOrganizationUID,
+      isSynced: false,
+    );
+  }
+
+  AttendanceModel _queuedCheckInModel(OfflineAttendanceAction a) =>
+      AttendanceModel(
+        id: a.id,
+        userId: a.delegateId,
+        organizationId: (a.checkIn['organizationId'] as String?) ?? '',
+        checkInTime: a.capturedAt,
+        latitude: a.lat,
+        longitude: a.lng,
+        branchName: a.checkIn['branchName'] as String?,
+        branchId: a.checkIn['branchId'] as String?,
+        branchOrganizationUID: a.checkIn['branchOrganizationUID'] as String?,
+        isSynced: false,
+      );
+
+  /// [items] with what is still queued on the phone for [userId]: offline
+  /// check-ins not on the server yet, and offline check-outs (TAS-363).
+  List<Attendance> _withPending(String userId, List<Attendance> items) {
+    final pending = offlineQueue.pending(userId);
+    if (pending.isEmpty) return items;
+    final out = <Attendance>[...items];
+    for (final a in pending.where((p) => p.isCheckIn)) {
+      if (!out.any((i) => i.id == a.id)) out.add(_queuedCheckInModel(a));
+    }
+    for (final a in pending.where((p) => !p.isCheckIn)) {
+      final i = out.indexWhere((x) => x.id == a.attendanceId);
+      if (i == -1) continue;
+      final x = out[i];
+      out[i] = (x is AttendanceModel ? x : _toModel(x)).copyWith(
+        checkOutTime: a.capturedAt,
+        isSynced: false,
+      );
+    }
+    out.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
+    return out;
+  }
+
+  AttendanceModel _toModel(Attendance a) => AttendanceModel(
+    id: a.id,
+    userId: a.userId,
+    organizationId: a.organizationId,
+    checkInTime: a.checkInTime,
+    checkOutTime: a.checkOutTime,
+    latitude: a.latitude,
+    longitude: a.longitude,
+    imageUrl: a.imageUrl,
+    branchName: a.branchName,
+    branchId: a.branchId,
+    branchOrganizationUID: a.branchOrganizationUID,
+    isSynced: a.isSynced,
+    isAutoCheckOut: a.isAutoCheckOut,
+    autoCheckOutReason: a.autoCheckOutReason,
+  );
 
   @override
   Future<Either<Failure, Attendance>> checkOut(
@@ -158,8 +443,29 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required String organizationId,
   }) async {
     try {
-      if (!await _hasConnection()) {
-        throw const ServerFailure(kCheckOutOfflineMessage);
+      // TAS-363: saved on the phone without network; a check-out of a
+      // check-in that is itself still queued is queued after it.
+      final queuedCheckIn = offlineQueue
+          .pending(userId)
+          .any((a) => a.isCheckIn && a.id == attendanceId);
+      if (!await _hasConnection() || queuedCheckIn) {
+        if (queuedCheckIn && await _hasConnection()) {
+          await syncPendingAttendance(userId: userId);
+        }
+        final stillQueued = offlineQueue
+            .pending(userId)
+            .any((a) => a.isCheckIn && a.id == attendanceId);
+        if (!await _hasConnection() || stillQueued) {
+          return Right(
+            await _saveOfflineCheckOut(
+              attendanceId: attendanceId,
+              userId: userId,
+              organizationId: organizationId,
+              lat: lat,
+              long: long,
+            ),
+          );
+        }
       }
 
       // --- Geofencing for Check-Out ---
@@ -199,6 +505,21 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       await localDataSource.updateAttendance(result, organizationId, userId);
       return Right(result);
     } catch (e) {
+      if (e is Failure && e.message == kCheckOutOfflineMessage) {
+        try {
+          return Right(
+            await _saveOfflineCheckOut(
+              attendanceId: attendanceId,
+              userId: userId,
+              organizationId: organizationId,
+              lat: lat,
+              long: long,
+            ),
+          );
+        } on Failure catch (offlineFailure) {
+          return Left(offlineFailure);
+        }
+      }
       if (e is Failure) return Left(e);
       return const Left(
         ServerFailure('حدث خطأ غير متوقع أثناء تسجيل الانصراف.'),
@@ -254,11 +575,17 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         await localDataSource.overwriteHistory(remoteHistory, organizationId, userId);
       } catch (_) {}
 
-      return Right(remoteHistory);
+      return Right(_withPending(userId, remoteHistory));
     } on Failure catch (e) {
       try {
-        final localHistory = await localDataSource.getLastAttendanceHistory(organizationId, userId);
-        final filtered = localHistory.where((a) => a.userId == userId).toList();
+        final localHistory = await localDataSource.getLastAttendanceHistory(
+          organizationId,
+          userId,
+        );
+        final filtered = _withPending(
+          userId,
+          localHistory.where((a) => a.userId == userId).toList(),
+        );
         if (filtered.isNotEmpty) {
           return Right(filtered);
         }
@@ -280,10 +607,14 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       if (!await _hasConnection()) {
         // Fallback to local history for the first page if offline
         if (lastDoc == null) {
-          final localHistory = await localDataSource.getLastAttendanceHistory(organizationId, userId);
-          final filtered = localHistory
-              .where((a) => a.userId == userId)
-              .toList();
+          final localHistory = await localDataSource.getLastAttendanceHistory(
+            organizationId,
+            userId,
+          );
+          final filtered = _withPending(
+            userId,
+            localHistory.where((a) => a.userId == userId).toList(),
+          );
           return Right(
             AttendancePaginationResult(
               items: filtered,
@@ -315,7 +646,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
       return Right(
         AttendancePaginationResult(
-          items: response.items,
+          items: lastDoc == null
+              ? _withPending(userId, response.items)
+              : response.items,
           lastDoc: response.lastDoc,
           hasReachedMax: response.hasReachedMax,
         ),
@@ -346,22 +679,51 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     }
   }
 
+  /// TAS-363: sends what [userId] saved offline, oldest first, one by one
+  /// through the attendance callables. An item leaves the queue only after
+  /// the server answered for it: written / already written, or refused on
+  /// purpose ([AttendanceServerRefused], then its check-out goes too and the
+  /// delegate is told why). Anything else (no network, server busy, signed
+  /// out) stops and keeps the rest for the next try. Same key twice gives one
+  /// record, so a retry after a lost answer is safe.
   @override
-  Future<Either<Failure, void>> syncPendingAttendance() async {
-    try {
-      final queue = await offlineQueue.getQueue();
-      if (queue.isEmpty) {
-        return const Right(null);
-      }
-
-      await remoteDataSource.syncOfflineQueue(queue);
-      await offlineQueue.clearQueue();
-      return const Right(null);
-    } on Failure catch (e) {
-      return Left(e);
-    } catch (e) {
-      return const Left(ServerFailure('خطأ غير متوقع أثناء المزامنة.'));
+  Future<Either<Failure, void>> syncPendingAttendance({String? userId}) async {
+    final uid = userId?.trim() ?? '';
+    if (uid.isEmpty) return const Right(null);
+    final items = offlineQueue.pending(uid);
+    if (items.isEmpty) return const Right(null);
+    if (!await _hasConnection()) {
+      return const Left(NetworkFailure(kOfflineSyncRetryMessage));
     }
+    final rejected = <String>[];
+    final droppedCheckIns = <String>{};
+    for (final a in items) {
+      if (!a.isCheckIn && droppedCheckIns.contains(a.attendanceId)) {
+        await offlineQueue.remove(uid, a.id);
+        continue;
+      }
+      try {
+        await remoteDataSource.sendOfflineAction(a);
+        await offlineQueue.remove(uid, a.id);
+      } on ServerFailure catch (f) {
+        // Refused on purpose: AttendanceServerRefused, or outside the branch
+        // (GeofenceOutsideFailure, TAS-397). Other server failures retry.
+        if (f is! AttendanceServerRefused && f is! GeofenceOutsideFailure) {
+          return const Left(NetworkFailure(kOfflineSyncRetryMessage));
+        }
+        await offlineQueue.remove(uid, a.id);
+        if (a.isCheckIn) droppedCheckIns.add(a.id);
+        rejected.add(f.message);
+      } catch (_) {
+        return const Left(NetworkFailure(kOfflineSyncRetryMessage));
+      }
+    }
+    if (rejected.isNotEmpty) {
+      return Left(
+        OfflineAttendanceRejected(offlineRecordRejectedMessage(rejected.first)),
+      );
+    }
+    return const Right(null);
   }
 
   @override
@@ -394,4 +756,41 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       );
     }
   }
+}
+
+/// TAS-363: a record saved offline was refused by the server when sent.
+class OfflineAttendanceRejected extends ServerFailure {
+  const OfflineAttendanceRejected(super.message);
+}
+
+class _OfflineCheckInArgs {
+  const _OfflineCheckInArgs({
+    required this.userId,
+    required this.lat,
+    required this.long,
+    required this.companyId,
+    required this.organizationId,
+    required this.deviceInfo,
+    this.branchName,
+    this.branchId,
+    this.branchOrganizationUID,
+    this.delegateName,
+    this.phoneNumber,
+    this.companyName,
+    this.personalPhotoURL,
+  });
+
+  final String userId;
+  final double lat;
+  final double long;
+  final String companyId;
+  final String organizationId;
+  final String deviceInfo;
+  final String? branchName;
+  final String? branchId;
+  final String? branchOrganizationUID;
+  final String? delegateName;
+  final String? phoneNumber;
+  final String? companyName;
+  final String? personalPhotoURL;
 }

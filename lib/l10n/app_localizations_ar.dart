@@ -937,6 +937,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get violationsPolicy => 'لائحة المخالفات';
 
   @override
+  String get mySalary => 'مرتبي';
+
+  @override
   String get myViolations => 'مخالفاتي';
 
   @override
@@ -3386,6 +3389,22 @@ class AppLocalizationsAr extends AppLocalizations {
       'لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع وجرّب تاني.';
 
   @override
+  String get locationWeakSignal =>
+      'الموقع مش واضح: الإشارة ضعيفة جوه المكان. اطلع جنب الباب أو شباك دقيقة وجرّب تاني.';
+
+  @override
+  String get locHelpReasonWeakSignal =>
+      'الموقع مش واضح: الإشارة ضعيفة جوه المكان. اطلع جنب الباب أو شباك دقيقة وجرّب تاني.';
+
+  @override
+  String get locHelpReasonNoFix =>
+      'مقدرناش نعرف موقعك. اقف في مكان مفتوح دقيقة وجرّب تاني.';
+
+  @override
+  String get attWeakSignalNearBranch =>
+      'الموقع مش واضح، فمش متأكدين إنك جوه الفرع. اطلع جنب الباب أو شباك دقيقة وجرّب تاني.';
+
+  @override
   String attBranchOtherChain(String chain) {
     return 'الفرع ده تبع سلسلة $chain. بدّل للسلسلة دي الأول وبعدين جرّب تاني.';
   }
@@ -3407,4 +3426,14 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get leaveMustStartToday =>
       'الطلب ده لازم يبدأ من النهارده أو بعده، وللأقدم كلّم الـ HR';
+
+  @override
+  String attPendingOfflineCount(int count) {
+    return '$count حضور/انصراف مستني يتبعت';
+  }
+
+  @override
+  String logoutPendingAttendanceWarning(int count) {
+    return 'استنى! $count حضور/انصراف لسه على الموبايل وماتبعتش. لو خرجت دلوقتي مش هيتبعتوا لحد ما تدخل تاني بنفس الحساب، فاستنى النت يرجع.';
+  }
 }

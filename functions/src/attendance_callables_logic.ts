@@ -106,6 +106,88 @@ export interface CheckInInput {
   phoneNumber: string;
   companyName: string;
   personalPhotoURL: string;
+  /** TAS-363: set when the check-in was saved on the phone without network. */
+  offline: OfflineMeta | null;
+}
+
+/**
+ * TAS-363: a record saved on the phone without network and sent later.
+ * `capturedAtMs` is the phone's trusted time (last server time + boot clock),
+ * `timeTrusted` is the phone's own verdict (false after a restart or with no
+ * sync), `syncedAtMs` the server time of the phone's last sync.
+ */
+export interface OfflineMeta {
+  capturedAtMs: number | null;
+  timeTrusted: boolean;
+  syncedAtMs: number | null;
+}
+
+export function parseOffline(data: unknown): OfflineMeta | null {
+  const d = (data && typeof data === "object") ? data as Record<string, unknown> : null;
+  if (!d || d.offline !== true) return null;
+  const captured = num(d.capturedAtMs);
+  const synced = num(d.syncedAtMs);
+  return {
+    capturedAtMs: captured != null && captured > 0 ? Math.round(captured) : null,
+    timeTrusted: d.timeTrusted === true,
+    syncedAtMs: synced != null && synced > 0 ? Math.round(synced) : null,
+  };
+}
+
+/** Oldest offline record the server accepts with its own time (24 h). */
+export const OFFLINE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** Clock skew allowed between the phone's trusted time and the server. */
+export const OFFLINE_FUTURE_SKEW_MS = 2 * 60 * 1000;
+
+export type OfflineTimeIssue =
+  | "device_untrusted"
+  | "no_captured_time"
+  | "in_future"
+  | "too_old"
+  | "before_last_sync"
+  | "before_last_session";
+
+export interface OfflineTime {
+  /** The time the record counts from (ms). */
+  atMs: number;
+  /** True when `atMs` is the phone's captured time and passed every limit. */
+  trusted: boolean;
+  /** Why the server used its own time instead, if it did. */
+  issue: OfflineTimeIssue | null;
+}
+
+/**
+ * TAS-363 (user decision 27 Nov): hours count right away. A trusted captured
+ * time inside the limits counts as is; otherwise the record counts from the
+ * time it reached the server, and HR can adjust it. Never refuses.
+ *
+ * Limits: not in the future (2 min skew), at most 24 h old, not before the
+ * phone's last sync, and after [notBeforeMs] (end of the last session for a
+ * check-in, the check-in itself for a check-out).
+ */
+export function decideOfflineTime(meta: OfflineMeta, nowMs: number, notBeforeMs: number | null): OfflineTime {
+  const server = (issue: OfflineTimeIssue): OfflineTime => ({atMs: nowMs, trusted: false, issue});
+  if (!meta.timeTrusted) return server("device_untrusted");
+  const at = meta.capturedAtMs;
+  if (at == null) return server("no_captured_time");
+  if (at > nowMs + OFFLINE_FUTURE_SKEW_MS) return server("in_future");
+  if (nowMs - at > OFFLINE_MAX_AGE_MS) return server("too_old");
+  if (meta.syncedAtMs != null && (at < meta.syncedAtMs || meta.syncedAtMs > nowMs + OFFLINE_FUTURE_SKEW_MS)) {
+    return server("before_last_sync");
+  }
+  if (notBeforeMs != null && at <= notBeforeMs) return server("before_last_session");
+  return {atMs: Math.min(at, nowMs), trusted: true, issue: null};
+}
+
+/** Latest moment the caller's recent records reach (check-in or check-out). */
+export function lastRecordEndMs(recent: RecentLog[]): number | null {
+  let max: number | null = null;
+  for (const l of recent) {
+    for (const v of [l.atMs, l.endMs]) {
+      if (v != null && (max == null || v > max)) max = v;
+    }
+  }
+  return max;
 }
 
 /** Validates the request shape. Everything trusted is re-read on the server. */
@@ -131,6 +213,7 @@ export function parseCheckIn(data: unknown): CheckInInput | Refusal {
     phoneNumber: str(d.phoneNumber).slice(0, 30),
     companyName: str(d.companyName).slice(0, 200),
     personalPhotoURL: str(d.personalPhotoURL).slice(0, 1000),
+    offline: parseOffline(d),
   };
 }
 
@@ -138,13 +221,14 @@ export interface CheckOutInput {
   attendanceId: string;
   lat: number | null;
   lng: number | null;
+  offline: OfflineMeta | null;
 }
 
 export function parseCheckOut(data: unknown): CheckOutInput | Refusal {
   const d = (data && typeof data === "object") ? data as Record<string, unknown> : {};
   const attendanceId = str(d.attendanceId);
   if (!ID_RE.test(attendanceId)) return refuse("bad_request");
-  return {attendanceId, lat: num(d.lat), lng: num(d.lng)};
+  return {attendanceId, lat: num(d.lat), lng: num(d.lng), offline: parseOffline(d)};
 }
 
 function validPos(lat: number | null, lng: number | null): boolean {
@@ -170,6 +254,8 @@ export interface RecentLog {
   branchOrganizationUID: string;
   branchName: string;
   closed: boolean;
+  /** Check-out time in ms, when the session has one. */
+  endMs: number | null;
 }
 
 export function toRecentLog(id: string, data: Doc, toMs: (v: unknown) => number | null): RecentLog {
@@ -182,6 +268,7 @@ export function toRecentLog(id: string, data: Doc, toMs: (v: unknown) => number 
     branchOrganizationUID: str(d.branchOrganizationUID) || str(d.organizationId),
     branchName: str(d.branchName),
     closed: d.checkOutTime != null || d.isAutoCheckOut === true || d.missingCheckOut === true,
+    endMs: toMs(d.checkOutTime),
   };
 }
 
@@ -274,6 +361,28 @@ export function buildCheckInDoc(input: CheckInInput, delegateId: string): Record
   if (input.companyName) doc.companyName = input.companyName;
   if (input.personalPhotoURL) doc.personalPhotoURL = input.personalPhotoURL;
   return doc;
+}
+
+/**
+ * TAS-363: fields that flag an offline record for HR (a flag only, not a
+ * condition for pay). `capturedAt` is what the phone claimed, `timeTrusted`
+ * is the server's verdict after the limits.
+ */
+export function offlineFields(
+  prefix: "" | "checkOut",
+  meta: OfflineMeta,
+  time: OfflineTime,
+  ts: (ms: number) => unknown = (ms) => ms,
+): Record<string, unknown> {
+  const k = (name: string) => prefix ? `${prefix}${name[0].toUpperCase()}${name.slice(1)}` : name;
+  const out: Record<string, unknown> = {
+    [k("timeTrusted")]: time.trusted,
+    [k("deviceTimeTrusted")]: meta.timeTrusted,
+  };
+  if (meta.capturedAtMs != null) out[k("capturedAt")] = ts(meta.capturedAtMs);
+  if (meta.syncedAtMs != null) out[k("deviceSyncedAt")] = ts(meta.syncedAtMs);
+  if (time.issue) out[k("offlineTimeIssue")] = time.issue;
+  return out;
 }
 
 export interface CheckOutDecisionInput {

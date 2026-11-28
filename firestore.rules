@@ -4095,6 +4095,10 @@ service cloud.firestore {
     }
 
     match /company_payroll_configs/{companyId} {
+      // TAS-366: a delegate (and a supervisor delegate) reads his own
+      // company's policy for the «مرتبي» estimate. Claims only (companyId /
+      // companyIds), no users get(); read only, never write.
+      allow get: if delegateInCompany(companyId);
       allow read, write: if isGlobalStaff()
         || (companyId == callerCompany() && (isHR() || isAccountant() || isCompanyAdmin() || isOrgAdmin()));
     }

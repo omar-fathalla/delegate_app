@@ -15,6 +15,16 @@ class AttendanceServerUncertain implements Exception {
   const AttendanceServerUncertain();
 }
 
+/// The server answered and refused the record on purpose (outside the
+/// branch, open session, not the owner, ...). A queued offline record that
+/// gets this is dropped (TAS-363); any other failure keeps it queued.
+class AttendanceServerRefused extends ServerFailure {
+  const AttendanceServerRefused(super.message, {this.reason});
+
+  /// Machine-readable reason from `details.reason`, when sent.
+  final String? reason;
+}
+
 /// Server side of attendance (TAS-361): `delegateCheckIn` / `delegateCheckOut`.
 ///
 /// Refusals throw a [ServerFailure] with the server's Arabic message
@@ -72,10 +82,11 @@ Object attendanceServerError(String code, Object? details, String? message) {
   final text = fromDetails is String && fromDetails.trim().isNotEmpty
       ? fromDetails
       : (message != null && message.trim().isNotEmpty
-          ? message
-          : 'تعذّر تسجيل العملية. حاول مرة تانية.');
+            ? message
+            : 'تعذّر تسجيل العملية. حاول مرة تانية.');
   // TAS-397: outside the branch is typed, so the screen can offer
-  // «الفرع مكانه غلط؟» for the server refusal too.
+  // «الفرع مكانه غلط؟» for the server refusal too. The offline sync treats
+  // it as a refusal on purpose like [AttendanceServerRefused] (TAS-363).
   if (details is Map && details['reason'] == 'outside_branch') {
     double? n(Object? v) => v is num ? v.toDouble() : null;
     final name = details['branchName'];
@@ -84,6 +95,13 @@ Object attendanceServerError(String code, Object? details, String? message) {
       distanceMeters: n(details['distanceMeters']),
       allowedMeters: n(details['allowedMeters']),
       branchName: name is String && name.trim().isNotEmpty ? name : null,
+    );
+  }
+  if (code == 'failed-precondition' || code == 'invalid-argument') {
+    final reason = details is Map ? details['reason'] : null;
+    return AttendanceServerRefused(
+      text,
+      reason: reason is String ? reason : null,
     );
   }
   return ServerFailure(text);

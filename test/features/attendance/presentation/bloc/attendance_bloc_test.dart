@@ -11,6 +11,8 @@ import 'package:delegate_app/features/attendance/domain/usecases/get_history_pag
 import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:delegate_app/features/attendance/data/repositories/attendance_repository_impl.dart'
+    show OfflineAttendanceRejected;
 import 'package:mocktail/mocktail.dart';
 
 class MockCheckIn extends Mock implements CheckIn {}
@@ -73,6 +75,7 @@ void main() {
     registerFallbackValue(FakeGetHistoryParams());
     registerFallbackValue(FakeGetHistoryPaginatedParams());
     registerFallbackValue(FakeNoParams());
+    registerFallbackValue(const SyncAttendanceParams(userId: 'u1'));
   });
 
   setUp(() {
@@ -311,6 +314,41 @@ void main() {
 
   group('SyncRequested', () {
     blocTest<AttendanceBloc, AttendanceState>(
+      'TAS-363: an offline record refused by the server shows why',
+      build: () {
+        when(() => mockSyncAttendance(any())).thenAnswer(
+          (_) async => const Left(OfflineAttendanceRejected('اترفض')),
+        );
+        return bloc;
+      },
+      seed: () => AttendanceHistoryLoaded(history: tHistory),
+      act: (bloc) => bloc.add(const SyncRequested(userId: 'u1')),
+      expect: () => [
+        AttendanceHistoryLoaded(
+          history: tHistory,
+          syncStatus: SyncStatus.inProgress,
+        ),
+        const AttendanceError(message: 'اترفض'),
+        AttendanceHistoryLoaded(
+          history: tHistory,
+          syncStatus: SyncStatus.inProgress,
+        ),
+        AttendanceHistoryLoaded(
+          history: tHistory,
+          syncStatus: SyncStatus.failure,
+        ),
+      ],
+    );
+
+    blocTest<AttendanceBloc, AttendanceState>(
+      'TAS-363: no user, nothing is sent',
+      build: () => bloc,
+      act: (bloc) => bloc.add(const SyncRequested()),
+      expect: () => const <AttendanceState>[],
+      verify: (_) => verifyNever(() => mockSyncAttendance(any())),
+    );
+
+    blocTest<AttendanceBloc, AttendanceState>(
       'emits SyncStatus changes if current state is AttendanceHistoryLoaded',
       build: () {
         when(
@@ -322,7 +360,7 @@ void main() {
         history: tHistory,
         activeAttendance: tAttendance,
       ),
-      act: (bloc) => bloc.add(const SyncRequested()),
+      act: (bloc) => bloc.add(const SyncRequested(userId: 'u1')),
       expect: () => [
         AttendanceHistoryLoaded(
           history: tHistory,
@@ -349,7 +387,7 @@ void main() {
         history: tHistory,
         activeAttendance: tAttendance,
       ),
-      act: (bloc) => bloc.add(const SyncRequested()),
+      act: (bloc) => bloc.add(const SyncRequested(userId: 'u1')),
       expect: () => [
         AttendanceHistoryLoaded(
           history: tHistory,

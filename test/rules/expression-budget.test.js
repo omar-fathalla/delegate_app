@@ -303,4 +303,20 @@ describe("expression budget headroom (TAS-105)", () => {
         .doc("organizations/o1/tasks/sent").update({status: "completed", notes: "done"}),
     });
   });
+  // TAS-366: a delegate reads his company's payroll policy («مرتبي»). Claims
+  // only, so it should stay far from the budget.
+  const PAYROLL_CONFIG_PAD = Number(process.env.RULES_BUDGET_PAD_PAYROLL_CONFIG || 300);
+  test(`company_payroll_configs get keeps ${PAYROLL_CONFIG_PAD} spare pad units (delegate reads his company)`, async () => {
+    await assertBudgetHeadroom({
+      rules: RULES,
+      line: "allow get: if delegateInCompany(companyId);",
+      pad: PAYROLL_CONFIG_PAD,
+      projectId: "demo-expression-budget-payroll-config",
+      seed: async (db) => {
+        await db.doc("company_payroll_configs/c1").set({calculationMode: "monthly_with_deductions"});
+      },
+      request: (e) => e.authenticatedContext("del-1", {...DELEGATE_TOKEN, companyId: "c1", otp_required: true, otp_verified: true})
+        .firestore().doc("company_payroll_configs/c1").get(),
+    });
+  });
 });

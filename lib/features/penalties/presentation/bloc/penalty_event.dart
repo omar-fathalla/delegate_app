@@ -100,3 +100,23 @@ class UpdatePenaltyRequestedEvent extends PenaltyEvent {
   List<Object?> get props => [penalty, newEvidenceFilesToUpload];
 }
 
+
+/// TAS-365: what a respondToPenalty call does.
+enum PenaltyResponseAction { acknowledge, dispute, upholdDispute, cancelPenalty }
+
+/// TAS-365: the delegate acknowledges / disputes its penalty, or a super
+/// admin / chain admin decides a dispute.
+class RespondToPenaltyEvent extends PenaltyEvent {
+  final String penaltyId;
+  final PenaltyResponseAction action;
+  final String? reason;
+
+  const RespondToPenaltyEvent({
+    required this.penaltyId,
+    required this.action,
+    this.reason,
+  });
+
+  @override
+  List<Object?> get props => [penaltyId, action, reason];
+}

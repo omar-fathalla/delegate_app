@@ -6,9 +6,14 @@
  *
  * Deploy (named only, tashil-dev first, prod with the combined release):
  *   functions:tashil-mobile-notifications:onPenaltyCreated
+ *
+ * TAS-365: a penalty created ISSUED (createSupervisorPenalty) also notifies
+ * its delegate here (penalty_delegate_notify). A normal penalty starts
+ * PENDING_BRANCHES_MARKETING, and the delegate hears when it is issued.
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
+import {notifyPenaltyChange} from "./penalty_delegate_notify";
 import {
   ManagerUser,
   penaltyManagerNotification,
@@ -36,12 +41,15 @@ export const onPenaltyCreated = functions.firestore
   .onCreate(async (snap, context) => {
     const penaltyId = context.params.penaltyId as string;
     const penalty = snap.data() || {};
+    const db = admin.firestore();
+    const del = await notifyPenaltyChange(db, penaltyId, null, penalty,
+      {eventMs: Date.parse(context.timestamp)});
+    if (del.delegate) functions.logger.info("onPenaltyCreated: delegate notified", {penaltyId});
     const org = penaltyOrganizationId(penalty);
     if (!org) {
       functions.logger.info("onPenaltyCreated: no organization", {penaltyId});
       return;
     }
-    const db = admin.firestore();
     const recipients = penaltyManagerRecipients(await loadOrganizationUsers(db, org), penalty);
     let written = 0;
     for (const r of recipients) {

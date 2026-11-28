@@ -1262,6 +1262,7 @@
     "description": "Wallets management label"
   },
   "violationsPolicy": "Violations policy",
+  "mySalary": "My salary",
   "myViolations": "My violations",
   "switchOrganization": "Switch organization",
   "manageOrganizationsChains": "Manage organizations and chains",
@@ -2700,6 +2701,14 @@
   "@locHelpStepMapsRetry": {"description": "TAS-283 location help card"},
   "locHelpStepMapsTryAgain": "Still no location: open Google Maps, wait for the blue dot to settle, then come back and try again.",
   "@locHelpStepMapsTryAgain": {"description": "TAS-283 location help card"},
+  "locationWeakSignal": "Your location isn't clear: the signal is weak inside. Stand by a door or window for a minute and try again.",
+  "@locationWeakSignal": {"description": "TAS-396 snackbar when the last known fix is too imprecise"},
+  "locHelpReasonWeakSignal": "Your location isn't clear: the signal is weak inside. Stand by a door or window for a minute and try again.",
+  "@locHelpReasonWeakSignal": {"description": "TAS-396 location help card reason, weak signal"},
+  "locHelpReasonNoFix": "We couldn't find your location. Stand in an open area for a minute and try again.",
+  "@locHelpReasonNoFix": {"description": "TAS-396 location help card reason, no fix"},
+  "attWeakSignalNearBranch": "Your location isn't clear, so we can't tell if you're inside the branch. Stand by a door or window for a minute and try again.",
+  "@attWeakSignalNearBranch": {"description": "TAS-396 outside the geofence only because the fix is imprecise"},
   "attBranchOtherChain": "This branch belongs to {chain}. Switch to that chain first, then try again.",
   "@attBranchOtherChain": {"description": "TAS-333 QR/branch of another chain of the delegate", "placeholders": {"chain": {"type": "String"}}},
   "attBranchNotYourChain": "This branch is not in any of your chains. Scan your own branch's code.",
@@ -2708,5 +2717,9 @@
   "@leaveOverlapExists": {"placeholders": {"type": {"type": "String"}, "from": {"type": "String"}, "to": {"type": "String"}}},
   "leaveTooOld": "You can only request up to {days} days back; for older dates contact HR",
   "@leaveTooOld": {"placeholders": {"days": {"type": "int"}}},
-  "leaveMustStartToday": "This request must start today or later; for older dates contact HR"
+  "leaveMustStartToday": "This request must start today or later; for older dates contact HR",
+  "attPendingOfflineCount": "{count} attendance records waiting to send",
+  "@attPendingOfflineCount": {"placeholders": {"count": {"type": "int"}}},
+  "logoutPendingAttendanceWarning": "Wait! {count} attendance records are still on this phone and not sent. If you log out now they will only be sent when you log in again with the same account, so wait for the network.",
+  "@logoutPendingAttendanceWarning": {"placeholders": {"count": {"type": "int"}}}
 }

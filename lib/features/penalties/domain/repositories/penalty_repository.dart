@@ -27,6 +27,15 @@ abstract class PenaltyRepository {
     String? reviewerName,
   });
   Future<Either<Failure, Unit>> deletePenalty(String penaltyId);
+
+  /// TAS-365: acknowledge / dispute (delegate) or resolve (super admin,
+  /// chain admin) through the respondToPenalty callable. Right: new status.
+  Future<Either<Failure, String>> respondToPenalty({
+    required String penaltyId,
+    required String action,
+    String? reason,
+    String? decision,
+  });
   Future<Either<Failure, Unit>> updatePenalty(PenaltyEntity penalty);
   Future<Either<Failure, EvidenceFile>> uploadEvidenceFile({
     required File file,
