@@ -440,6 +440,33 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadQR => 'تحميل كصورة';
 
   @override
+  String branchQrSigned(int version) {
+    return 'كود موقّع، الإصدار $version';
+  }
+
+  @override
+  String get branchQrLegacy => 'كود قديم من غير توقيع. اعمل كود جديد واطبعه.';
+
+  @override
+  String get branchQrRegenerate => 'اعمل كود جديد';
+
+  @override
+  String get branchQrRegenerateTitle => 'تعمل كود حضور جديد؟';
+
+  @override
+  String get branchQrRegenerateBody =>
+      'الكود المطبوع دلوقتي في الفرع هيبطل، والمناديب مش هيقدروا يسجلوا بيه. لازم تطبع الكود الجديد وتعلّقه في الفرع.';
+
+  @override
+  String get branchQrRegenerateConfirm => 'اعمل كود جديد';
+
+  @override
+  String get branchQrRegenerated => 'اتعمل كود جديد. اطبعه وعلّقه في الفرع.';
+
+  @override
+  String get branchQrLoadFailed => 'مقدرناش نجيب الكود الموقّع. جرّب تاني.';
+
+  @override
   String get qrSavedToGallery => 'تم حفظ رمز QR في المعرض بنجاح!';
 
   @override

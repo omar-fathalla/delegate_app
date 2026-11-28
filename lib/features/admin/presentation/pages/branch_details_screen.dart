@@ -11,25 +11,37 @@ import 'package:go_router/go_router.dart';
 import 'package:screenshot/screenshot.dart';
 import 'dart:convert';
 import 'package:gal/gal.dart';
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
+import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/features/admin/data/services/branch_attendance_qr_service.dart';
 
 class BranchDetailsScreen extends StatelessWidget {
   final BranchModel branch;
 
-  const BranchDetailsScreen({super.key, required this.branch});
+  /// TAS-372: the signed QR source; defaults to the `branchAttendanceQr`
+  /// callable. Injectable for tests.
+  final BranchAttendanceQrService? qrService;
+
+  const BranchDetailsScreen({super.key, required this.branch, this.qrService});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => di.sl<BranchBloc>(),
-      child: _BranchDetailsView(branch: branch),
+      child: _BranchDetailsView(
+        branch: branch,
+        qrService: qrService ?? FirebaseBranchAttendanceQrService(),
+      ),
     );
   }
 }
 
 class _BranchDetailsView extends StatefulWidget {
   final BranchModel branch;
+  final BranchAttendanceQrService qrService;
 
-  const _BranchDetailsView({required this.branch});
+  const _BranchDetailsView({required this.branch, required this.qrService});
 
   @override
   State<_BranchDetailsView> createState() => _BranchDetailsViewState();
@@ -40,10 +52,70 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
   bool _isDownloading = false;
   final ScreenshotController _screenshotController = ScreenshotController();
 
+  /// TAS-372: the branch's signed QR (null until loaded, or on failure).
+  BranchAttendanceQr? _signedQr;
+  bool _qrBusy = false;
+
   @override
   void initState() {
     super.initState();
     _branch = widget.branch;
+    _loadSignedQr();
+  }
+
+  Future<void> _loadSignedQr({bool regenerate = false}) async {
+    final orgUid = _branch.organizationUID?.trim() ?? '';
+    if (_branch.id.isEmpty || orgUid.isEmpty) return;
+    setState(() => _qrBusy = true);
+    try {
+      final qr = await widget.qrService.fetch(
+        branchId: _branch.id,
+        organizationUID: orgUid,
+        regenerate: regenerate,
+      );
+      if (!mounted) return;
+      setState(() => _signedQr = qr);
+      if (regenerate) {
+        AppSnackBar.showSuccess(
+          context,
+          AppLocalizations.of(context)!.branchQrRegenerated,
+        );
+      }
+    } catch (e) {
+      debugPrint('branchAttendanceQr failed: ${e.runtimeType}');
+      if (mounted && regenerate) {
+        AppSnackBar.showError(
+          context,
+          AppLocalizations.of(context)!.branchQrLoadFailed,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _qrBusy = false);
+    }
+  }
+
+  /// Version + 1: the QR printed before stops working (TAS-372).
+  Future<void> _regenerateQr() async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showTashilDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(l10n.branchQrRegenerateTitle),
+        content: Text(l10n.branchQrRegenerateBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: Text(MaterialLocalizations.of(c).cancelButtonLabel),
+          ),
+          TextButton(
+            key: const Key('branchQr.confirmRegenerate'),
+            onPressed: () => Navigator.pop(c, true),
+            child: Text(l10n.branchQrRegenerateConfirm),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) await _loadSignedQr(regenerate: true);
   }
 
   Future<void> _editBranch() async {
@@ -158,12 +230,17 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
     final l10n = AppLocalizations.of(context)!;
 
     final orgUid = _branch.organizationUID?.trim() ?? '';
-    final qrData = jsonEncode({
-      'type': 'attendance',
-      'branch': _branch.branchName,
-      if (_branch.id.isNotEmpty) 'branchId': _branch.id,
-      if (orgUid.isNotEmpty) 'organizationUID': orgUid,
-    });
+    // TAS-372: the server-signed QR when the branch has one; the old
+    // unsigned QR otherwise (still accepted until the first signed QR).
+    final signed = _signedQr;
+    final qrData = signed != null && signed.isSigned
+        ? jsonEncode(signed.payload)
+        : jsonEncode({
+            'type': 'attendance',
+            'branch': _branch.branchName,
+            if (_branch.id.isNotEmpty) 'branchId': _branch.id,
+            if (orgUid.isNotEmpty) 'organizationUID': orgUid,
+          });
 
     return BlocConsumer<BranchBloc, BranchState>(
       listener: (context, state) {
@@ -329,9 +406,28 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: TashilSpacing.md),
+                    // TAS-372: signed or old QR, and regenerate (version + 1).
+                    Text(
+                      signed != null && signed.isSigned
+                          ? l10n.branchQrSigned(signed.version)
+                          : l10n.branchQrLegacy,
+                      key: const Key('branchQr.status'),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (_branch.id.isNotEmpty && orgUid.isNotEmpty)
+                      TextButton.icon(
+                        key: const Key('branchQr.regenerate'),
+                        onPressed: isLoading || _qrBusy ? null : _regenerateQr,
+                        icon: const Icon(Icons.qr_code_2_rounded),
+                        label: Text(l10n.branchQrRegenerate),
+                      ),
+                    const SizedBox(height: TashilSpacing.lg),
                     FilledButton.icon(
-                      onPressed: isLoading ? null : _downloadQR,
+                      onPressed: isLoading || _qrBusy ? null : _downloadQR,
                       icon: const Icon(Icons.file_download_rounded),
                       label: Text(
                         l10n.downloadQR,

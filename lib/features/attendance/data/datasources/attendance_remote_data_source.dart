@@ -40,6 +40,7 @@ abstract class AttendanceRemoteDataSource {
     String? phoneNumber,
     String? companyName,
     String? personalPhotoURL,
+    Map<String, dynamic>? qrProof,
   });
   Future<AttendanceModel> checkOut(
     String attendanceId,
@@ -157,6 +158,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String? phoneNumber,
     String? companyName,
     String? personalPhotoURL,
+    Map<String, dynamic>? qrProof,
   }) async {
     try {
       final trustedNow = _trustedNow();
@@ -270,6 +272,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           'phoneNumber': ?trimmedPhone,
           'companyName': ?trimmedCompany,
           'personalPhotoURL': ?trimmedPhoto,
+          // TAS-372: the scanned QR, checked by delegateCheckIn.
+          'qr': ?qrProof,
         },
       );
       if (!byServer) {

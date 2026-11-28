@@ -34,16 +34,28 @@ class FirebaseAttendanceServerApi implements AttendanceServerApi {
 
   @override
   Future<Map<String, dynamic>> checkIn(Map<String, dynamic> data) =>
-      _call('delegateCheckIn', data);
+      // TAS-372: a limited-use App Check token, consumed by the callable, so
+      // the server's integrity mark cannot be replayed from another call.
+      _call('delegateCheckIn', data, limitedUseAppCheckToken: true);
 
   @override
   Future<Map<String, dynamic>> checkOut(Map<String, dynamic> data) =>
       _call('delegateCheckOut', data);
 
-  Future<Map<String, dynamic>> _call(String name, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> _call(
+    String name,
+    Map<String, dynamic> data, {
+    bool limitedUseAppCheckToken = false,
+  }) async {
     try {
       final result = await functions
-          .httpsCallable(name, options: HttpsCallableOptions(timeout: _timeout))
+          .httpsCallable(
+            name,
+            options: HttpsCallableOptions(
+              timeout: _timeout,
+              limitedUseAppCheckToken: limitedUseAppCheckToken,
+            ),
+          )
           .call<dynamic>(data)
           .timeout(_timeout + const Duration(seconds: 5));
       final raw = result.data;

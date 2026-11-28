@@ -21,6 +21,7 @@ class CheckInRequested extends AttendanceEvent {
   final String? phoneNumber;
   final String? companyName;
   final String? personalPhotoURL;
+  final Map<String, dynamic>? qrProof;
 
   const CheckInRequested({
     required this.userId,
@@ -36,6 +37,7 @@ class CheckInRequested extends AttendanceEvent {
     this.phoneNumber,
     this.companyName,
     this.personalPhotoURL,
+    this.qrProof,
   });
 
   @override
@@ -53,6 +55,7 @@ class CheckInRequested extends AttendanceEvent {
     phoneNumber,
     companyName,
     personalPhotoURL,
+    qrProof,
   ];
 }
 
@@ -138,6 +141,7 @@ class CheckOutAndCheckInRequested extends AttendanceEvent {
   final String? phoneNumber;
   final String? companyName;
   final String? personalPhotoURL;
+  final Map<String, dynamic>? qrProof;
 
   const CheckOutAndCheckInRequested({
     required this.oldAttendanceId,
@@ -154,6 +158,7 @@ class CheckOutAndCheckInRequested extends AttendanceEvent {
     this.phoneNumber,
     this.companyName,
     this.personalPhotoURL,
+    this.qrProof,
   });
 
   @override
@@ -172,5 +177,6 @@ class CheckOutAndCheckInRequested extends AttendanceEvent {
     phoneNumber,
     companyName,
     personalPhotoURL,
+    qrProof,
   ];
 }

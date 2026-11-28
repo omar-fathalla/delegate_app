@@ -608,6 +608,14 @@
   "@downloadQR": {
     "description": "Button to download the QR code."
   },
+  "branchQrSigned": "كود موقّع، الإصدار {version}",
+  "branchQrLegacy": "كود قديم من غير توقيع. اعمل كود جديد واطبعه.",
+  "branchQrRegenerate": "اعمل كود جديد",
+  "branchQrRegenerateTitle": "تعمل كود حضور جديد؟",
+  "branchQrRegenerateBody": "الكود المطبوع دلوقتي في الفرع هيبطل، والمناديب مش هيقدروا يسجلوا بيه. لازم تطبع الكود الجديد وتعلّقه في الفرع.",
+  "branchQrRegenerateConfirm": "اعمل كود جديد",
+  "branchQrRegenerated": "اتعمل كود جديد. اطبعه وعلّقه في الفرع.",
+  "branchQrLoadFailed": "مقدرناش نجيب الكود الموقّع. جرّب تاني.",
   "qrSavedToGallery": "تم حفظ رمز QR في المعرض بنجاح!",
   "@qrSavedToGallery": {
     "description": "Message shown when QR is saved to gallery"

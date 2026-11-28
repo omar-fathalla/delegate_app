@@ -440,6 +440,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadQR => 'Download QR';
 
   @override
+  String branchQrSigned(int version) {
+    return 'Signed code, version $version';
+  }
+
+  @override
+  String get branchQrLegacy =>
+      'Old unsigned code. Create a new one and print it.';
+
+  @override
+  String get branchQrRegenerate => 'Create new code';
+
+  @override
+  String get branchQrRegenerateTitle => 'Create a new attendance code?';
+
+  @override
+  String get branchQrRegenerateBody =>
+      'The code printed at the branch now will stop working. Print the new code and put it up at the branch.';
+
+  @override
+  String get branchQrRegenerateConfirm => 'Create new code';
+
+  @override
+  String get branchQrRegenerated =>
+      'New code created. Print it and put it up at the branch.';
+
+  @override
+  String get branchQrLoadFailed =>
+      'We couldn\'t load the signed code. Try again.';
+
+  @override
   String get qrSavedToGallery => 'QR Code saved to gallery successfully!';
 
   @override

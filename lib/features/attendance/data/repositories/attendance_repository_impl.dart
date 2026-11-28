@@ -99,6 +99,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     String? phoneNumber,
     String? companyName,
     String? personalPhotoURL,
+    Map<String, dynamic>? qrProof,
   }) async {
     try {
       if (!await _hasConnection()) {
@@ -134,6 +135,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         phoneNumber: phoneNumber,
         companyName: companyName,
         personalPhotoURL: personalPhotoURL,
+        qrProof: qrProof,
       );
       // Always cache attendance after successful remote write
       await localDataSource.cacheAttendance(result, organizationId, userId);

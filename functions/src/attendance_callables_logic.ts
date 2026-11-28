@@ -8,7 +8,8 @@
  * the identity comes from the token. A check-out is never refused for the
  * distance; it is flagged (checkOutOutsideBranch) for HR.
  *
- * Limits: the position is still the one the phone sends (fake GPS: TAS-372).
+ * Limits: the position is still the one the phone sends. TAS-372 adds the
+ * signed branch QR and the App Check integrity mark (attendance_qr_logic.ts).
  */
 import {
   GEOFENCE_TOLERANCE_METERS,
@@ -37,7 +38,10 @@ export type AttendanceReason =
   | "same_branch_today"
   | "record_not_found"
   | "not_owner"
-  | "already_checked_out";
+  | "already_checked_out"
+  // TAS-372: the scanned QR.
+  | "qr_invalid"
+  | "qr_old";
 
 export interface Refusal {
   ok: false;
@@ -65,6 +69,8 @@ export const MESSAGES: Record<AttendanceReason, string> = {
   record_not_found: "سجل الحضور مش موجود.",
   not_owner: "سجل الحضور ده مش بتاعك.",
   already_checked_out: "إنت سجلت انصراف بالفعل.",
+  qr_invalid: "الكود ده مش كود حضور سليم للفرع ده. امسح الكود المطبوع في الفرع.",
+  qr_old: "الكود ده قديم، والمشرف عمل كود جديد للفرع. امسح الكود المطبوع في الفرع دلوقتي.",
 };
 
 export function refuse(reason: AttendanceReason, extra: Partial<Refusal> = {}): Refusal {
@@ -106,6 +112,8 @@ export interface CheckInInput {
   phoneNumber: string;
   companyName: string;
   personalPhotoURL: string;
+  /** TAS-372: the scanned QR as sent by the app (parsed by parseQrProof). */
+  qr: unknown;
 }
 
 /** Validates the request shape. Everything trusted is re-read on the server. */
@@ -131,6 +139,7 @@ export function parseCheckIn(data: unknown): CheckInInput | Refusal {
     phoneNumber: str(d.phoneNumber).slice(0, 30),
     companyName: str(d.companyName).slice(0, 200),
     personalPhotoURL: str(d.personalPhotoURL).slice(0, 1000),
+    qr: d.qr,
   };
 }
 

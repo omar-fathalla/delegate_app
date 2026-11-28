@@ -74,6 +74,7 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     String? phoneNumber,
     String? companyName,
     String? personalPhotoURL,
+    Map<String, dynamic>? qrProof,
   }) {
     if (checkInStub != null) {
       return checkInStub!(
@@ -508,6 +509,7 @@ void main() {
         String? phoneNumber,
         String? companyName,
         String? personalPhotoURL,
+        Map<String, dynamic>? qrProof,
       }) async {
         written = {
           'organizationId': organizationId,

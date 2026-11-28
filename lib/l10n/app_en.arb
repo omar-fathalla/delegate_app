@@ -600,6 +600,22 @@
   "@downloadQR": {
     "description": "Button to download the QR code."
   },
+  "branchQrSigned": "Signed code, version {version}",
+  "@branchQrSigned": {"description": "TAS-372 branch QR status", "placeholders": {"version": {"type": "int"}}},
+  "branchQrLegacy": "Old unsigned code. Create a new one and print it.",
+  "@branchQrLegacy": {"description": "TAS-372 branch QR status"},
+  "branchQrRegenerate": "Create new code",
+  "@branchQrRegenerate": {"description": "TAS-372 regenerate the branch QR"},
+  "branchQrRegenerateTitle": "Create a new attendance code?",
+  "@branchQrRegenerateTitle": {"description": "TAS-372 confirm dialog title"},
+  "branchQrRegenerateBody": "The code printed at the branch now will stop working. Print the new code and put it up at the branch.",
+  "@branchQrRegenerateBody": {"description": "TAS-372 confirm dialog body"},
+  "branchQrRegenerateConfirm": "Create new code",
+  "@branchQrRegenerateConfirm": {"description": "TAS-372 confirm action"},
+  "branchQrRegenerated": "New code created. Print it and put it up at the branch.",
+  "@branchQrRegenerated": {"description": "TAS-372 snackbar"},
+  "branchQrLoadFailed": "We couldn't load the signed code. Try again.",
+  "@branchQrLoadFailed": {"description": "TAS-372 snackbar"},
   "qrSavedToGallery": "QR Code saved to gallery successfully!",
   "@qrSavedToGallery": {
     "description": "Message shown when QR is saved to gallery"

@@ -138,6 +138,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         phoneNumber: event.phoneNumber,
         companyName: event.companyName,
         personalPhotoURL: event.personalPhotoURL,
+        qrProof: event.qrProof,
       ),
     );
     result.fold(
@@ -353,6 +354,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
             phoneNumber: event.phoneNumber,
             companyName: event.companyName,
             personalPhotoURL: event.personalPhotoURL,
+            qrProof: event.qrProof,
           ),
         );
 

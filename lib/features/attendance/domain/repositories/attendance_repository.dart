@@ -18,6 +18,7 @@ abstract class AttendanceRepository {
     String? phoneNumber,
     String? companyName,
     String? personalPhotoURL,
+    Map<String, dynamic>? qrProof,
   });
   Future<Either<Failure, Attendance>> checkOut(
     String attendanceId,
