@@ -30,6 +30,7 @@
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
+import {defineSecret} from "firebase-functions/params";
 import {callerDelegateId, callerSelfIds} from "./caller_delegate_id";
 import {
   CheckInInput,
@@ -50,10 +51,39 @@ import {
   refuse,
   toRecentLog,
 } from "./attendance_callables_logic";
+import {
+  branchQrVersion,
+  buildQrPayload,
+  decideQr,
+  deviceIntegrityOf,
+  mayManageBranchQr,
+  parseQrProof,
+} from "./attendance_qr_logic";
+import {canonicalStaffRole} from "./staff_claims_sync_logic";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
 const RECENT_LIMIT = 20;
+
+/**
+ * TAS-372: HMAC key of the printed branch QR (Secret Manager). Must exist on
+ * the project before deploy:
+ *   firebase functions:secrets:set ATTENDANCE_QR_KEY --project <project>
+ */
+export const ATTENDANCE_QR_KEY = defineSecret("ATTENDANCE_QR_KEY");
+
+/** "reject" after the forced update; default accepts unsigned (legacy) QRs. */
+function legacyQrMode(): string {
+  return String(process.env.ATTENDANCE_LEGACY_QR || "accept").trim().toLowerCase();
+}
+
+function qrKey(): string {
+  try {
+    return ATTENDANCE_QR_KEY.value() || "";
+  } catch {
+    return "";
+  }
+}
 
 function isRefusal(x: unknown): x is Refusal {
   return !!x && typeof x === "object" && (x as {ok?: unknown}).ok === false;
@@ -108,6 +138,9 @@ async function recentLogs(
 
 export const delegateCheckIn = functions
   .region("us-central1")
+  // TAS-372: the app sends a limited-use App Check token; consuming it marks
+  // a replay. Not enforced (monitoring) until the forced update.
+  .runWith({secrets: [ATTENDANCE_QR_KEY], consumeAppCheckToken: true})
   .https.onCall(async (data: unknown, context) => {
     const token = requireAuth(context);
     const parsed = parseCheckIn(data);
@@ -125,6 +158,22 @@ export const delegateCheckIn = functions
     ]);
     const membership = membershipSnap.exists ? (membershipSnap.data() || {}) : null;
     const ref = db.collection("attendance_logs").doc(input.requestId);
+
+    // TAS-372: the scanned QR (signature + current version of the branch).
+    const qr = decideQr({
+      proof: parseQrProof(input.qr),
+      branchId: input.branchId,
+      branchOrganizationUID: input.branchOrganizationUID,
+      branch,
+      key: qrKey(),
+      legacyMode: legacyQrMode(),
+    });
+    if (isRefusal(qr)) {
+      functions.logger.info("delegateCheckIn: QR refused", {delegateId, reason: qr.reason,
+        branchId: input.branchId});
+      fail(qr);
+    }
+    const deviceIntegrity = deviceIntegrityOf(context.app);
 
     const result = await db.runTransaction(async (tx) => {
       const existing = await tx.get(ref);
@@ -146,6 +195,10 @@ export const delegateCheckIn = functions
       const serverNow = admin.firestore.FieldValue.serverTimestamp();
       tx.create(ref, {
         ...buildCheckInDoc(input, delegateId),
+        // TAS-372: server-only marks (the rules refuse them from clients).
+        qrCheck: qr.qrCheck,
+        ...(qr.qrVersion != null ? {qrVersion: qr.qrVersion} : {}),
+        deviceIntegrity,
         timestamp: offline?.trusted ? admin.firestore.Timestamp.fromMillis(offline.atMs) : serverNow,
         ...(input.offline && offline ? {
           offlineCheckIn: true,
@@ -167,6 +220,80 @@ export const delegateCheckIn = functions
       already: result.already,
       distanceMeters: result.distanceMeters,
       ...(result.offline ? {timeTrusted: result.offline.trusted, countedFromMs: result.offline.atMs} : {}),
+    };
+  });
+
+/** The branch doc ref (nested under its chain first, then root). */
+async function branchRef(db: FirebaseFirestore.Firestore, org: string, branchId: string):
+  Promise<FirebaseFirestore.DocumentReference | null> {
+  const nested = db.collection("organizations").doc(org).collection("branches").doc(branchId);
+  if ((await nested.get()).exists) return nested;
+  const root = db.collection("branches").doc(branchId);
+  const snap = await root.get();
+  if (!snap.exists) return null;
+  const rootOrg = String((snap.data() || {}).organizationUID || "").trim();
+  return !rootOrg || rootOrg === org ? root : null;
+}
+
+/**
+ * TAS-372: the signed QR of a branch, for the admin to print.
+ *
+ * {branchId, organizationUID, regenerate?: boolean}
+ * - regenerate false: returns the current signed QR, or {qr: null} when the
+ *   branch has none yet (the screen then shows the old QR and a button).
+ * - regenerate true: qrVersion + 1 (transaction), so every QR printed before
+ *   is refused by delegateCheckIn ("qr_old").
+ * Allowed: super-admin, technical support, or this chain's org admin (the
+ * same people the rules let edit the branch).
+ */
+export const branchAttendanceQr = functions
+  .region("us-central1")
+  .runWith({secrets: [ATTENDANCE_QR_KEY]})
+  .https.onCall(async (data: unknown, context) => {
+    const token = requireAuth(context);
+    const d = (data && typeof data === "object") ? data as Record<string, unknown> : {};
+    const branchId = typeof d.branchId === "string" ? d.branchId.trim() : "";
+    const org = typeof d.organizationUID === "string" ? d.organizationUID.trim() : "";
+    if (!branchId || !org) {
+      throw new functions.https.HttpsError("invalid-argument", "الفرع مش محدد.");
+    }
+    if (!mayManageBranchQr(token, canonicalStaffRole(token.role), org)) {
+      throw new functions.https.HttpsError("permission-denied", "مش مسموحلك تعمل كود حضور للفرع ده.");
+    }
+    const key = qrKey();
+    if (!key) {
+      functions.logger.error("branchAttendanceQr: ATTENDANCE_QR_KEY is not set");
+      throw new functions.https.HttpsError("failed-precondition", "كود الحضور الموقّع مش متاح دلوقتي.");
+    }
+    const db = admin.firestore();
+    const ref = await branchRef(db, org, branchId);
+    if (!ref) throw new functions.https.HttpsError("not-found", "الفرع ده مش موجود.");
+
+    const result = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const b = snap.data() || {};
+      let version = branchQrVersion(b);
+      if (d.regenerate === true) {
+        version += 1;
+        tx.update(ref, {
+          qrVersion: version,
+          qrUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          qrUpdatedBy: context.auth?.uid || "",
+        });
+      }
+      const name = String(b.branchName || b.name || "").trim();
+      return {version, name};
+    });
+
+    if (d.regenerate === true) {
+      functions.logger.info("branchAttendanceQr: regenerated", {branchId, org, version: result.version,
+        by: context.auth?.uid});
+    }
+    if (result.version < 1) return {qr: null, qrVersion: 0};
+    return {
+      qrVersion: result.version,
+      qr: buildQrPayload({key, organizationUID: org, branchId, branchName: result.name,
+        qrVersion: result.version}),
     };
   });
 

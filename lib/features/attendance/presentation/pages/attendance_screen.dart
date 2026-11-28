@@ -2669,6 +2669,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ? widget.delegate.companyName
             : null,
         personalPhotoURL: widget.delegate.personalPhotoForCopy,
+        qrProof: branchRef.qrProof,
       ),
     );
   }
@@ -2907,6 +2908,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         ? widget.delegate.companyName
                         : null,
                     personalPhotoURL: widget.delegate.personalPhotoForCopy,
+                    qrProof: newBranch.qrProof,
                   ),
                 );
               },
@@ -2969,6 +2971,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         ? widget.delegate.companyName
                         : null,
                     personalPhotoURL: widget.delegate.personalPhotoForCopy,
+                    qrProof: newBranch.qrProof,
                   ),
                 );
               },
@@ -3120,6 +3123,10 @@ class _ScannerModalState extends State<_ScannerModal>
                                 widget.delegateOrganizationUID,
                           );
                         }
+                        // TAS-372: the server checks the signature/version.
+                        scannedRef = scannedRef.withQrProof(
+                          attendanceQrProof(decoded),
+                        );
                       }
                     } catch (_) {
                       if (rawValue.isNotEmpty && !rawValue.startsWith('{')) {
@@ -3127,7 +3134,7 @@ class _ScannerModalState extends State<_ScannerModal>
                           branchName: rawValue.trim(),
                           delegateOrganizationUID:
                               widget.delegateOrganizationUID,
-                        );
+                        ).withQrProof(attendanceQrProof(null));
                       }
                     }
 

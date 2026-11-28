@@ -99,6 +99,7 @@ class CheckIn implements UseCase<Attendance, CheckInParams> {
       phoneNumber: params.phoneNumber,
       companyName: params.companyName,
       personalPhotoURL: params.personalPhotoURL,
+      qrProof: params.qrProof,
     );
   }
 }
@@ -119,6 +120,9 @@ class CheckInParams extends Equatable {
   final String? companyName;
   final String? personalPhotoURL;
 
+  /// TAS-372: the scanned QR (signed fields, or {legacy: true}).
+  final Map<String, dynamic>? qrProof;
+
   const CheckInParams({
     required this.userId,
     required this.companyId,
@@ -134,6 +138,7 @@ class CheckInParams extends Equatable {
     this.phoneNumber,
     this.companyName,
     this.personalPhotoURL,
+    this.qrProof,
   });
 
   @override
@@ -152,5 +157,6 @@ class CheckInParams extends Equatable {
     phoneNumber,
     companyName,
     personalPhotoURL,
+    qrProof,
   ];
 }

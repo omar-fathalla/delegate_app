@@ -148,6 +148,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     String? phoneNumber,
     String? companyName,
     String? personalPhotoURL,
+    Map<String, dynamic>? qrProof,
   }) async {
     final offlineArgs = _OfflineCheckInArgs(
       userId: userId,
@@ -208,6 +209,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         phoneNumber: phoneNumber,
         companyName: companyName,
         personalPhotoURL: personalPhotoURL,
+        qrProof: qrProof,
       );
       // Always cache attendance after successful remote write
       await localDataSource.cacheAttendance(result, organizationId, userId);

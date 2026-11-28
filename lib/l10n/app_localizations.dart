@@ -896,6 +896,54 @@ abstract class AppLocalizations {
   /// **'Download QR'**
   String get downloadQR;
 
+  /// TAS-372 branch QR status
+  ///
+  /// In en, this message translates to:
+  /// **'Signed code, version {version}'**
+  String branchQrSigned(int version);
+
+  /// TAS-372 branch QR status
+  ///
+  /// In en, this message translates to:
+  /// **'Old unsigned code. Create a new one and print it.'**
+  String get branchQrLegacy;
+
+  /// TAS-372 regenerate the branch QR
+  ///
+  /// In en, this message translates to:
+  /// **'Create new code'**
+  String get branchQrRegenerate;
+
+  /// TAS-372 confirm dialog title
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new attendance code?'**
+  String get branchQrRegenerateTitle;
+
+  /// TAS-372 confirm dialog body
+  ///
+  /// In en, this message translates to:
+  /// **'The code printed at the branch now will stop working. Print the new code and put it up at the branch.'**
+  String get branchQrRegenerateBody;
+
+  /// TAS-372 confirm action
+  ///
+  /// In en, this message translates to:
+  /// **'Create new code'**
+  String get branchQrRegenerateConfirm;
+
+  /// TAS-372 snackbar
+  ///
+  /// In en, this message translates to:
+  /// **'New code created. Print it and put it up at the branch.'**
+  String get branchQrRegenerated;
+
+  /// TAS-372 snackbar
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load the signed code. Try again.'**
+  String get branchQrLoadFailed;
+
   /// Message shown when QR is saved to gallery
   ///
   /// In en, this message translates to:

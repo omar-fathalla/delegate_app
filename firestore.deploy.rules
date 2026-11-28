@@ -1702,9 +1702,12 @@ return d.get('organizationId', '') != '' ? d.get('organizationId', '') : d.get('
 function attendanceCoOf(d) {
 return d.get('companyId', '') != '' ? d.get('companyId', '') : d.get('companyUID', '');
 }
+function attendanceServerKeys() {
+return ['qrCheck', 'qrVersion', 'deviceIntegrity'];
+}
 function canCreateAttendance() {
 let d = request.resource.data;
-return signedIn() && (attendanceOwns(d)
+return signedIn() && !d.keys().hasAny(attendanceServerKeys()) && (attendanceOwns(d)
 ? attendanceOwnCreateOk()
 && (staffToken()
 ? staffTargetOk(attendanceOrgOf(d), attendanceCoOf(d), true)
@@ -1722,6 +1725,7 @@ let old = resource.data;
 return signedIn() && (attendanceOwns(old)
 ? attendanceOwnUpdateOk()
 : (staffToken()
+&& !d.diff(old).affectedKeys().hasAny(attendanceServerKeys())
 && attendanceOrgOf(d) == attendanceOrgOf(old)
 && attendanceCoOf(d) == attendanceCoOf(old)
 && staffTargetOk(attendanceOrgOf(old), attendanceCoOf(old), true)));

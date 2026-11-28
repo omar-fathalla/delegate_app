@@ -37,6 +37,7 @@ class MockAttendanceRepository implements AttendanceRepository {
     String? phoneNumber,
     String? companyName,
     String? personalPhotoURL,
+    Map<String, dynamic>? qrProof,
   }) async {
     return Right(
       Attendance(
