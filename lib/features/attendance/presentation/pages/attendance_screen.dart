@@ -2125,6 +2125,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
     }
 
+    final weakSignal =
+        matched == null &&
+        closest != null &&
+        minDistance.isFinite &&
+        isOutsideBecauseOfWeakSignal(
+          distanceMeters: minDistance,
+          accuracyMeters: position.accuracy,
+          radiusMeters: allowedGeofenceRadius(closest),
+        );
+
     setState(() {
       _isCheckingLocation = false;
       _nearestBranch = closest;
@@ -2145,7 +2155,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               )
             : AppLocalizations.of(context)!.attYouAreWithinBranch(branchLabel);
       } else if (closest != null && minDistance.isFinite) {
-        _locationStatusMessage = AppLocalizations.of(context)!.attMoveCloser;
+        // TAS-396: an imprecise fix whose error circle reaches the branch is
+        // a weak signal, not "move closer". The geofence decision is
+        // unchanged.
+        _locationStatusMessage = weakSignal
+            ? AppLocalizations.of(context)!.attWeakSignalNearBranch
+            : AppLocalizations.of(context)!.attMoveCloser;
+        if (weakSignal && !silent) {
+          _locationFailure = LocationFailureKind.weakSignal;
+        }
       } else {
         _locationStatusMessage = AppLocalizations.of(
           context,
@@ -2167,6 +2185,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             BranchDisplayCache.instance.displayName(matched.branchName),
             minDistance.toInt(),
           ),
+        );
+      } else if (weakSignal) {
+        AppSnackBar.showError(
+          context,
+          AppLocalizations.of(context)!.locationWeakSignal,
         );
       } else if (closest != null) {
         AppSnackBar.showError(
@@ -2715,11 +2738,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final fix = await _locationFetcher.fetch();
       if (fix == null) {
         if (context.mounted && !silent) {
+          // TAS-396: weak signal (imprecise position) vs no position at all.
+          final weak = _locationFetcher.lastFailure?.reason ==
+              LocationFetchFailureReason.weakSignal;
           AppSnackBar.showError(
             context,
-            AppLocalizations.of(context)!.locationTimeout,
+            locationFailureMessage(
+              AppLocalizations.of(context)!,
+              _locationFetcher.lastFailure,
+            ),
           );
-          _reportLocationFailure(context, LocationFailureKind.noFix);
+          _reportLocationFailure(
+            context,
+            weak ? LocationFailureKind.weakSignal : LocationFailureKind.noFix,
+          );
         }
         return null;
       }

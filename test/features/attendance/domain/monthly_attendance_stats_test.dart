@@ -151,4 +151,63 @@ void main() {
     );
     expect(nov.presentDays, 0);
   });
+
+  // TAS-379: the two cases reported from the store build (v1.14.2), where the
+  // attendance tab counted the loaded history page only. The whole month
+  // must give the same numbers as the home card.
+  group('TAS-379 reported cases (November 2026)', () {
+    final nov = DateTime(2026, 11);
+
+    test('Arzaq: 21 days on one branch, on 26 Nov: 21 present, 2 absent', () {
+      const days = [
+        1, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, //
+        17, 18, 19, 20, 21, 22, 24, 25, 26,
+      ];
+      final st = MonthlyAttendanceStats.compute(
+        sessions: [
+          for (final d in days)
+            _s(DateTime(2026, 11, d, 9), DateTime(2026, 11, d, 17)),
+        ],
+        month: nov,
+        now: DateTime(2026, 11, 26, 18),
+        createdAt: DateTime(2025, 1, 1),
+      );
+      expect(st.presentDays, 21);
+      expect(st.absentDays, 2);
+    });
+
+    test(
+      'Dunia: 3 branches a day and a 10→12 Nov session, on 28 Nov: '
+      '21 present, 3 absent',
+      () {
+        // Days with a check-in; 4-7, 11, 18 and 25 have none (11 is inside
+        // the session that started on the 10th and ended on the 12th).
+        const days = [
+          1, 2, 3, 8, 9, 10, 12, 13, 14, 15, 16, //
+          17, 19, 20, 21, 22, 23, 24, 26, 27, 28,
+        ];
+        final sessions = <Attendance>[
+          for (final d in days)
+            if (d != 10) ...[
+              // Three branches the same day count as one day.
+              _s(DateTime(2026, 11, d, 9), DateTime(2026, 11, d, 11)),
+              _s(DateTime(2026, 11, d, 12), DateTime(2026, 11, d, 14)),
+              _s(DateTime(2026, 11, d, 15), DateTime(2026, 11, d, 18)),
+            ],
+          _s(DateTime(2026, 11, 10, 10, 40), DateTime(2026, 11, 12, 9)),
+        ];
+        // More sessions than one history page ever held.
+        expect(sessions.length, greaterThan(60));
+        final st = MonthlyAttendanceStats.compute(
+          sessions: sessions,
+          month: nov,
+          now: DateTime(2026, 11, 28, 20),
+          createdAt: DateTime(2025, 1, 1),
+        );
+        expect(st.presentDays, 21);
+        expect(st.presentDayKeys, isNot(contains('2026-11-11')));
+        expect(st.absentDays, 3);
+      },
+    );
+  });
 }

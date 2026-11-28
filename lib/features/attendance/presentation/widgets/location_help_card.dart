@@ -18,8 +18,12 @@ enum LocationFailureKind {
   /// The app is permanently refused location permission.
   permissionDeniedForever,
 
-  /// No usable position in time (weak GPS, low accuracy).
+  /// No usable position in time (no fix at all, or only an old one).
   noFix,
+
+  /// The phone has a position, but it is too imprecise: weak signal,
+  /// usually indoors (TAS-396).
+  weakSignal,
 
   /// Any other error while reading the position.
   error;
@@ -69,6 +73,14 @@ class LocationHelpCard extends StatelessWidget {
     final openLocation =
         openLocationSettings ?? Geolocator.openLocationSettings;
     final openApp = openAppSettings ?? Geolocator.openAppSettings;
+
+    // TAS-396: say why first, so it shows in the zone card and in the QR
+    // flow's bottom sheet alike.
+    final reason = switch (kind) {
+      LocationFailureKind.weakSignal => l10n.locHelpReasonWeakSignal,
+      LocationFailureKind.noFix => l10n.locHelpReasonNoFix,
+      _ => null,
+    };
 
     final steps = <String>[
       if (android) l10n.locHelpStepGoogleAccuracy,
@@ -125,6 +137,14 @@ class LocationHelpCard extends StatelessWidget {
               ),
             ],
           ),
+          if (reason != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              reason,
+              key: const Key('locationHelp.reason'),
+              style: textTheme.bodyMedium,
+            ),
+          ],
           const SizedBox(height: 8),
           for (var i = 0; i < steps.length; i++)
             Padding(
