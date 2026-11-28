@@ -44,3 +44,14 @@ class PenaltyErrorState extends PenaltyState {
   @override
   List<Object?> get props => [message];
 }
+
+/// TAS-365: an action on one penalty failed (e.g. the dispute window
+/// closed). The list stays on screen; the page shows the message.
+class PenaltyActionFailedState extends PenaltyState {
+  final String message;
+
+  const PenaltyActionFailedState(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}

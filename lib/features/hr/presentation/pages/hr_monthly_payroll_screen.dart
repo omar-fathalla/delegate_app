@@ -295,12 +295,14 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         final data = doc.data();
         // TAS-308: stored statuses are ISSUED / ACKNOWLEDGED / DEDUCTED.
         if (isPayrollDeductiblePenaltyStatus(data['status'])) {
-          final ts = data['createdAt'];
-          if (ts is Timestamp) {
-            final pDate = ts.toDate();
-            if (pDate.isBefore(monthStart) || pDate.isAfter(monthEnd)) {
-              continue;
-            }
+          // TAS-365: deductionMonth (upheld after a dispute) wins over the
+          // creation month.
+          if (!isPenaltyInPayrollMonth(
+            data,
+            year: _selectedMonth.year,
+            month: _selectedMonth.month,
+          )) {
+            continue;
           }
           final delId = (data['targetDelegateId'] ?? '').toString();
           if (delId.isNotEmpty) {

@@ -119,6 +119,28 @@ class PenaltyRepositoryImpl implements PenaltyRepository {
   }
 
   @override
+  Future<Either<Failure, String>> respondToPenalty({
+    required String penaltyId,
+    required String action,
+    String? reason,
+    String? decision,
+  }) async {
+    try {
+      final status = await remoteDataSource.respondToPenalty(
+        penaltyId: penaltyId,
+        action: action,
+        reason: reason,
+        decision: decision,
+      );
+      return Right(status);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('تعذر إرسال الرد على الجزاء. حاول تاني.'));
+    }
+  }
+
+  @override
   Future<Either<Failure, Unit>> deletePenalty(String penaltyId) async {
     try {
       await remoteDataSource.deletePenalty(penaltyId);

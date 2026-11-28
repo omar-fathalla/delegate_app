@@ -16,7 +16,7 @@ import {
  * records a penalty on another delegate of the same company. The rules do not
  * let a delegate token write penalties, so the server does it. The penalty is
  * ISSUED at once and the HR payroll deducts it in the month it was created.
- * onPenaltyCreated notifies the organization's managers.
+ * onPenaltyCreated notifies the organization's managers and the delegate (TAS-365).
  *
  * Request: { organizationUID?, companyUID?, targetDelegateId, title, category,
  *            incidentDescription?, fineAmount, branchId?, branchName? }
@@ -81,7 +81,10 @@ export const createSupervisorPenalty = functions
     });
     const ref = db.collection("penalties").doc();
     const now = admin.firestore.FieldValue.serverTimestamp();
-    await ref.set({...doc, penaltyId: ref.id, createdAt: now, updatedAt: now, issuedAt: now});
+    // notifyByServerAt == updatedAt: onPenaltyCreated notifies the delegate
+    // at once (TAS-365), no old-app notification to wait for.
+    await ref.set({...doc, penaltyId: ref.id, createdAt: now, updatedAt: now, issuedAt: now,
+      notifyByServerAt: now});
     functions.logger.info("createSupervisorPenalty", {
       penaltyId: ref.id, companyUID: scope.companyUID, supervisorId: supervisor.id,
       targetDelegateId: input.targetDelegateId, fineAmount: input.fineAmount,

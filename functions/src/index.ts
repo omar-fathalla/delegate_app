@@ -19,6 +19,9 @@ admin.initializeApp();
 
 export {onTaskCreated, onTaskUpdated} from "./task_notify";
 export {onPenaltyCreated} from "./penalty_notify";
+// TAS-365: delegate penalty notifications and the dispute flow.
+export {onPenaltyUpdated} from "./penalty_delegate_notify";
+export {respondToPenalty} from "./respond_to_penalty";
 export {getTaskImage, onTaskImageFinalize} from "./task_image_access";
 export {getTaskProofImage, onTaskDeleted, onTaskProofWritten} from "./task_proof_access";
 
