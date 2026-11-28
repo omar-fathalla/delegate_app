@@ -30,6 +30,13 @@ class PenaltyModel extends PenaltyEntity {
     super.isConfidential = false,
     required super.createdAt,
     required super.updatedAt,
+    super.issuedAt,
+    super.disputeReason,
+    super.disputedAt,
+    super.disputeResolution,
+    super.disputeResolutionReason,
+    super.disputeResolvedByName,
+    super.deductionMonth,
   });
 
   factory PenaltyModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -83,6 +90,13 @@ class PenaltyModel extends PenaltyEntity {
       isConfidential: data['isConfidential'] ?? false,
       createdAt: parseTimestamp(data['createdAt']),
       updatedAt: parseTimestamp(data['updatedAt']),
+      issuedAt: parseNullableTimestamp(data['issuedAt']),
+      disputeReason: _nonEmpty(data['disputeReason']),
+      disputedAt: parseNullableTimestamp(data['disputedAt']),
+      disputeResolution: _nonEmpty(data['disputeResolution']),
+      disputeResolutionReason: _nonEmpty(data['disputeResolutionReason']),
+      disputeResolvedByName: _nonEmpty(data['disputeResolvedByName']),
+      deductionMonth: _nonEmpty(data['deductionMonth']),
     );
   }
 
@@ -152,6 +166,13 @@ class PenaltyModel extends PenaltyEntity {
       isConfidential: entity.isConfidential,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
+      issuedAt: entity.issuedAt,
+      disputeReason: entity.disputeReason,
+      disputedAt: entity.disputedAt,
+      disputeResolution: entity.disputeResolution,
+      disputeResolutionReason: entity.disputeResolutionReason,
+      disputeResolvedByName: entity.disputeResolvedByName,
+      deductionMonth: entity.deductionMonth,
     );
   }
 }

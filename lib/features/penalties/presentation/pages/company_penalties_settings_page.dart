@@ -20,6 +20,7 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.d
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
 import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evidence_viewer.dart';
+import 'package:delegate_app/features/penalties/presentation/widgets/penalty_response_panel.dart';
 import 'package:delegate_app/features/penalties/presentation/utils/penalty_creator_helper.dart';
 import 'package:delegate_app/features/penalties/presentation/utils/penalty_list_scope.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_create_penalty_page.dart';
@@ -524,8 +525,9 @@ class _CompanyPenaltiesSettingsPageState
       final tid = p.targetDelegateId!.trim();
       if (tid == delegate.uid) return true;
       if (delegate.delegatePublicId.isNotEmpty &&
-          tid == delegate.delegatePublicId)
+          tid == delegate.delegatePublicId) {
         return true;
+      }
 
       final cleanTid = tid.replaceAll(RegExp(r'\D'), '');
       final cleanDelPhone = delegate.phoneNumber.replaceAll(RegExp(r'\D'), '');
@@ -741,14 +743,21 @@ class _CompanyPenaltiesSettingsPageState
       // had no case for it and went blank without reloading. Keep the list
       // on screen, confirm, and reload.
       body: BlocConsumer<PenaltyBloc, PenaltyState>(
-        listenWhen: (_, state) => state is PenaltyActionSuccessState,
+        listenWhen: (_, state) =>
+            state is PenaltyActionSuccessState ||
+            state is PenaltyActionFailedState,
         listener: (context, state) {
           if (state is PenaltyActionSuccessState) {
             showTashilSnackBar(context, state.message);
             _loadData();
+          } else if (state is PenaltyActionFailedState) {
+            // TAS-365: keep the list, say why (e.g. the window closed).
+            showTashilSnackBar(context, state.message);
           }
         },
-        buildWhen: (_, state) => state is! PenaltyActionSuccessState,
+        buildWhen: (_, state) =>
+            state is! PenaltyActionSuccessState &&
+            state is! PenaltyActionFailedState,
         builder: (context, state) {
           if (state is PenaltyLoadingState) {
             return const Center(child: CircularProgressIndicator());
@@ -1501,7 +1510,12 @@ class _PenaltyCardState extends State<_PenaltyCard> {
         ((widget.currentDelegate?.role == UserRole.organizationAdmin ||
                 widget.currentDelegate?.role == UserRole.superAdmin ||
                 widget.currentDelegate?.role == UserRole.technicalSupport) &&
-            widget.penalty.status == PenaltyStatus.pendingGeneralManager);
+            widget.penalty.status == PenaltyStatus.pendingGeneralManager) ||
+        // TAS-365: a new penalty for the delegate, a dispute for a decider.
+        (PenaltyResponsePanel.isPenaltyDelegate(widget.currentDelegate) &&
+            widget.penalty.status == PenaltyStatus.issued) ||
+        (PenaltyResponsePanel.isDecider(widget.currentDelegate) &&
+            widget.penalty.status == PenaltyStatus.disputed);
     _isExpanded = requiresAction;
   }
 
@@ -2182,6 +2196,13 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       ),
                     ],
                   ],
+                ),
+
+                // TAS-365: acknowledge / dispute (delegate), decide (super
+                // admin, chain admin).
+                PenaltyResponsePanel(
+                  penalty: widget.penalty,
+                  currentDelegate: widget.currentDelegate,
                 ),
 
                 // Approval Action Buttons per Role

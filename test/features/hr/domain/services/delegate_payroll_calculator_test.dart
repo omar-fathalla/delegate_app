@@ -133,6 +133,30 @@ void main() {
       final list = DelegatePayrollCalculator.deductiblePenalties(octoberPenalties('x'), _october);
       expect(list.map((p) => p['fineAmount']), [50, 30]);
     });
+
+    test('TAS-365: an upheld dispute is deducted in its deductionMonth', () {
+      final upheld = {
+        'status': 'ISSUED',
+        'fineAmount': 70,
+        'createdAt': Timestamp.fromDate(DateTime(2026, 9, 20)),
+        'deductionMonth': '2026-10',
+      };
+      final movedOut = {
+        'status': 'ISSUED',
+        'fineAmount': 40,
+        'createdAt': Timestamp.fromDate(DateTime(2026, 10, 5)),
+        'deductionMonth': '2026-11',
+      };
+      final disputed = {
+        'status': 'DISPUTED',
+        'fineAmount': 90,
+        'createdAt': Timestamp.fromDate(DateTime(2026, 10, 6)),
+      };
+      final oct = DelegatePayrollCalculator.deductiblePenalties([upheld, movedOut, disputed], _october);
+      expect(oct.map((p) => p['fineAmount']), [70]);
+      final nov = DelegatePayrollCalculator.deductiblePenalties([upheld, movedOut, disputed], DateTime(2026, 11));
+      expect(nov.map((p) => p['fineAmount']), [40]);
+    });
   });
 
   group('golden: same numbers as the old HR loop', () {
