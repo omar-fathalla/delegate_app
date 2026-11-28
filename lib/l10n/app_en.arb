@@ -2708,5 +2708,9 @@
   "@leaveOverlapExists": {"placeholders": {"type": {"type": "String"}, "from": {"type": "String"}, "to": {"type": "String"}}},
   "leaveTooOld": "You can only request up to {days} days back; for older dates contact HR",
   "@leaveTooOld": {"placeholders": {"days": {"type": "int"}}},
-  "leaveMustStartToday": "This request must start today or later; for older dates contact HR"
+  "leaveMustStartToday": "This request must start today or later; for older dates contact HR",
+  "attPendingOfflineCount": "{count} attendance records waiting to send",
+  "@attPendingOfflineCount": {"placeholders": {"count": {"type": "int"}}},
+  "logoutPendingAttendanceWarning": "Wait! {count} attendance records are still on this phone and not sent. If you log out now they will only be sent when you log in again with the same account, so wait for the network.",
+  "@logoutPendingAttendanceWarning": {"placeholders": {"count": {"type": "int"}}}
 }

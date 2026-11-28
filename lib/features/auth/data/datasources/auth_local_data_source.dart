@@ -109,7 +109,10 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
       if (key.startsWith('cachedAttendance') ||
           key.startsWith('cached_attendance') ||
           key.startsWith('activeAttendance') ||
-          key.startsWith('cachedOfflineQueue') ||
+          // TAS-363: the old single-device queue key (never filled). The
+          // per-delegate queue `offline_attendance_queue_v1_*` is kept on
+          // logout on purpose: it is sent at the same delegate's next login.
+          key == 'cachedOfflineAttendanceQueue' ||
           key.startsWith('cached_penalties') ||
           key.startsWith('cached_leaves') ||
           key.startsWith('cached_recent_photos') ||

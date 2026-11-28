@@ -3403,4 +3403,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get leaveMustStartToday =>
       'This request must start today or later; for older dates contact HR';
+
+  @override
+  String attPendingOfflineCount(int count) {
+    return '$count attendance records waiting to send';
+  }
+
+  @override
+  String logoutPendingAttendanceWarning(int count) {
+    return 'Wait! $count attendance records are still on this phone and not sent. If you log out now they will only be sent when you log in again with the same account, so wait for the network.';
+  }
 }

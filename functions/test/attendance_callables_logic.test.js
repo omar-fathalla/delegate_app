@@ -111,3 +111,64 @@ test("check-out distance never refuses: outside is a flag", () => {
   assert.deepEqual(L.checkOutDistance(null, null, BRANCH), {distanceMeters: null, outside: false});
   assert.deepEqual(L.checkOutDistance(30.05, 31.2, null), {distanceMeters: null, outside: false});
 });
+
+// TAS-363: offline records (saved on the phone, sent later).
+const MIN = 60 * 1000;
+const meta = (extra = {}) => ({capturedAtMs: NOW - 2 * HOUR, timeTrusted: true, syncedAtMs: NOW - 5 * HOUR, ...extra});
+
+test("offline meta is parsed only when offline: true", () => {
+  assert.equal(L.parseOffline({capturedAtMs: 1}), null);
+  assert.deepEqual(L.parseOffline({offline: true, capturedAtMs: 1700000000000.4, timeTrusted: true, syncedAtMs: 0}),
+    {capturedAtMs: 1700000000000, timeTrusted: true, syncedAtMs: null});
+  assert.equal(L.parseOffline({offline: true, timeTrusted: "yes"}).timeTrusted, false);
+  assert.equal(input({offline: true, capturedAtMs: NOW, timeTrusted: true}).offline.capturedAtMs, NOW);
+  assert.equal(input().offline, null);
+  assert.equal(L.parseCheckOut({attendanceId: "req-000001", offline: true, capturedAtMs: NOW}).offline.capturedAtMs,
+    NOW);
+});
+
+test("trusted captured time inside the limits counts as is", () => {
+  const t = L.decideOfflineTime(meta(), NOW, NOW - 3 * HOUR);
+  assert.deepEqual(t, {atMs: NOW - 2 * HOUR, trusted: true, issue: null});
+  // A minute ahead (clock skew) is clamped to the server time.
+  assert.deepEqual(L.decideOfflineTime(meta({capturedAtMs: NOW + MIN}), NOW, null),
+    {atMs: NOW, trusted: true, issue: null});
+});
+
+test("untrusted or out-of-limits time counts from arrival, never refused", () => {
+  const issue = (m, notBefore = null) => {
+    const t = L.decideOfflineTime(meta(m), NOW, notBefore);
+    assert.equal(t.atMs, NOW);
+    assert.equal(t.trusted, false);
+    return t.issue;
+  };
+  assert.equal(issue({timeTrusted: false}), "device_untrusted");
+  assert.equal(issue({capturedAtMs: null}), "no_captured_time");
+  assert.equal(issue({capturedAtMs: NOW + 10 * MIN}), "in_future");
+  assert.equal(issue({capturedAtMs: NOW - 25 * HOUR, syncedAtMs: NOW - 30 * HOUR}), "too_old");
+  assert.equal(issue({syncedAtMs: NOW - HOUR}), "before_last_sync");
+  assert.equal(issue({}, NOW - HOUR), "before_last_session");
+  assert.equal(issue({}, NOW - 2 * HOUR), "before_last_session");
+});
+
+test("last record end takes check-ins and check-outs", () => {
+  assert.equal(L.lastRecordEndMs([]), null);
+  assert.equal(L.lastRecordEndMs([log({atMs: NOW - 5 * HOUR, endMs: NOW - 3 * HOUR}), log({atMs: NOW - 4 * HOUR})]),
+    NOW - 3 * HOUR);
+  assert.equal(L.toRecentLog("a", {type: "check_in", checkOutTime: 5}, (v) => v).endMs, 5);
+});
+
+test("offline fields flag the record for HR with the server's verdict", () => {
+  const f = L.offlineFields("", meta(), {atMs: NOW, trusted: false, issue: "too_old"});
+  assert.deepEqual(f, {timeTrusted: false, deviceTimeTrusted: true, capturedAt: NOW - 2 * HOUR,
+    deviceSyncedAt: NOW - 5 * HOUR, offlineTimeIssue: "too_old"});
+  const o = L.offlineFields("checkOut", meta({syncedAtMs: null}), {atMs: NOW, trusted: true, issue: null});
+  assert.deepEqual(o, {checkOutTimeTrusted: true, checkOutDeviceTimeTrusted: true, checkOutCapturedAt: NOW - 2 * HOUR});
+});
+
+test("an offline check-in is judged at its captured time", () => {
+  // Open session that the captured time is still inside of.
+  const open = [log({atMs: NOW - 12 * HOUR, branchId: "b9", branchName: "Fake Other"})];
+  assert.equal(decide({recent: open, nowMs: NOW}).ok, true);
+  assert.equal(decide({recent: open, nowMs: NOW - 2 * HOUR}).reason, "open_session_other_branch");
+});

@@ -56,7 +56,9 @@ abstract class AttendanceRepository {
   );
 
   /// Synchronizes offline attendance records with the remote server.
-  Future<Either<Failure, void>> syncPendingAttendance();
+  /// TAS-363: sends the attendance [userId] saved on the phone without
+  /// network (nothing to do without a user).
+  Future<Either<Failure, void>> syncPendingAttendance({String? userId});
 
   /// Saves or updates a branch with its geofence data.
   Future<Either<Failure, void>> saveBranch({

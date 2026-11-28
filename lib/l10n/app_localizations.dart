@@ -6017,6 +6017,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This request must start today or later; for older dates contact HR'**
   String get leaveMustStartToday;
+
+  /// No description provided for @attPendingOfflineCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} attendance records waiting to send'**
+  String attPendingOfflineCount(int count);
+
+  /// No description provided for @logoutPendingAttendanceWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait! {count} attendance records are still on this phone and not sent. If you log out now they will only be sent when you log in again with the same account, so wait for the network.'**
+  String logoutPendingAttendanceWarning(int count);
 }
 
 class _AppLocalizationsDelegate

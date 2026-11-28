@@ -3407,4 +3407,14 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get leaveMustStartToday =>
       'الطلب ده لازم يبدأ من النهارده أو بعده، وللأقدم كلّم الـ HR';
+
+  @override
+  String attPendingOfflineCount(int count) {
+    return '$count حضور/انصراف مستني يتبعت';
+  }
+
+  @override
+  String logoutPendingAttendanceWarning(int count) {
+    return 'استنى! $count حضور/انصراف لسه على الموبايل وماتبعتش. لو خرجت دلوقتي مش هيتبعتوا لحد ما تدخل تاني بنفس الحساب، فاستنى النت يرجع.';
+  }
 }
