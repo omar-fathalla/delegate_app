@@ -74,5 +74,17 @@ Object attendanceServerError(String code, Object? details, String? message) {
       : (message != null && message.trim().isNotEmpty
           ? message
           : 'تعذّر تسجيل العملية. حاول مرة تانية.');
+  // TAS-397: outside the branch is typed, so the screen can offer
+  // «الفرع مكانه غلط؟» for the server refusal too.
+  if (details is Map && details['reason'] == 'outside_branch') {
+    double? n(Object? v) => v is num ? v.toDouble() : null;
+    final name = details['branchName'];
+    return GeofenceOutsideFailure(
+      text,
+      distanceMeters: n(details['distanceMeters']),
+      allowedMeters: n(details['allowedMeters']),
+      branchName: name is String && name.trim().isNotEmpty ? name : null,
+    );
+  }
   return ServerFailure(text);
 }

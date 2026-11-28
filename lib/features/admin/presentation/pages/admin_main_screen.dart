@@ -52,6 +52,8 @@ import 'package:delegate_app/features/tracking/presentation/pages/delegate_track
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_device_unbind_requests_screen.dart';
+import 'package:delegate_app/features/branch_reports/data/branch_location_report_repository.dart';
+import 'package:delegate_app/features/branch_reports/presentation/branch_location_reports_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_field_photos_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuses_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_monthly_payroll_screen.dart';
@@ -329,6 +331,14 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               hrDelegate: widget.delegate,
               showAppBar: true,
             ),
+          ),
+        );
+        break;
+      case 'branch_location_reports':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                BranchLocationReportsScreen(viewer: widget.delegate),
           ),
         );
         break;
@@ -833,6 +843,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               customIcon: buildBadgeIcon(Icons.phonelink_lock_rounded, 'device_unbind_requests'),
               title: 'طلبات فك وربط الأجهزة',
             ),
+            // TAS-397: company supervisor reviews; chain admin and global
+            // staff close forwarded reports. Not HR or other roles.
+            if (BranchReportViewer.of(widget.delegate) !=
+                BranchReportViewer.none)
+              buildPopupItem(
+                value: 'branch_location_reports',
+                icon: Icons.wrong_location_rounded,
+                title: BranchReportsScreenTexts.title,
+              ),
             buildPopupItem(
               value: 'anti_fraud',
               icon: Icons.security_rounded,

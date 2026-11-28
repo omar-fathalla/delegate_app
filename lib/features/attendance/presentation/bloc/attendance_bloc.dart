@@ -1,4 +1,5 @@
 import 'package:delegate_app/core/attendance/attendance_branch_ref.dart';
+import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:bloc/bloc.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
@@ -142,7 +143,12 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     );
     result.fold(
       (failure) {
-        emit(AttendanceError(message: failure.message));
+        emit(
+          AttendanceError(
+            message: failure.message,
+            outsideGeofence: failure is GeofenceOutsideFailure,
+          ),
+        );
         if (previousLoadedState != null) emit(previousLoadedState);
       },
       (attendance) {
@@ -167,12 +173,18 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         long: event.long,
       ),
     );
-    result.fold((failure) => emit(AttendanceError(message: failure.message)), (
-      attendance,
-    ) {
-      emit(AttendanceCheckedOut(attendance: attendance));
-      _reviewService?.triggerSmartReview();
-    });
+    result.fold(
+      (failure) => emit(
+        AttendanceError(
+          message: failure.message,
+          outsideGeofence: failure is GeofenceOutsideFailure,
+        ),
+      ),
+      (attendance) {
+        emit(AttendanceCheckedOut(attendance: attendance));
+        _reviewService?.triggerSmartReview();
+      },
+    );
   }
 
   Future<void> _onGetHistory(

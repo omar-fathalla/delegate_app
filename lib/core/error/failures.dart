@@ -13,6 +13,35 @@ class ServerFailure extends Failure {
   const ServerFailure([super.message]);
 }
 
+/// Attendance refused because the delegate stands outside the branch's
+/// geofence (TAS-397), from the app's own check or from the server
+/// (`reason: outside_branch`). Still a [ServerFailure], so every existing
+/// `is ServerFailure` / message path keeps working; the screen uses the type
+/// to offer «الفرع مكانه غلط؟».
+class GeofenceOutsideFailure extends ServerFailure {
+  const GeofenceOutsideFailure(
+    super.message, {
+    this.distanceMeters,
+    this.allowedMeters,
+    this.branchId,
+    this.branchName,
+  });
+
+  final double? distanceMeters;
+  final double? allowedMeters;
+  final String? branchId;
+  final String? branchName;
+
+  @override
+  List<Object> get props => [
+    message,
+    distanceMeters ?? -1,
+    allowedMeters ?? -1,
+    branchId ?? '',
+    branchName ?? '',
+  ];
+}
+
 class CacheFailure extends Failure {
   const CacheFailure([super.message]);
 }

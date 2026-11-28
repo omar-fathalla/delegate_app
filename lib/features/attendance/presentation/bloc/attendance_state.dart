@@ -80,8 +80,12 @@ class AttendanceHistoryLoaded extends AttendanceState {
 class AttendanceError extends AttendanceState {
   final String message;
 
-  const AttendanceError({required this.message});
+  /// TAS-397: the refusal was «outside the branch's geofence», so the screen
+  /// offers «الفرع مكانه غلط؟» next to the message.
+  final bool outsideGeofence;
+
+  const AttendanceError({required this.message, this.outsideGeofence = false});
 
   @override
-  List<Object> get props => [message];
+  List<Object> get props => [message, outsideGeofence];
 }

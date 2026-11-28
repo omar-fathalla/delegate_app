@@ -42,6 +42,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/features/branch_reports/presentation/report_branch_location_sheet.dart';
 import 'package:intl/intl.dart' hide Bidi, TextDirection;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
@@ -682,7 +683,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               ),
             );
           } else if (state is AttendanceError) {
-            AppSnackBar.showError(context, state.message);
+            if (state.outsideGeofence) {
+              _showOutsideGeofence(context, state.message);
+            } else {
+              AppSnackBar.showError(context, state.message);
+            }
           } else if (state is AttendanceHistoryLoaded) {
             _rawHistory = state.history;
             _recomputeFilteredHistory();
@@ -2283,6 +2288,35 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
+  /// TAS-397: a delegate refused outside the geofence can report that the
+  /// branch's position is wrong. The supervisor reviews the report; nothing
+  /// moves the branch by itself.
+  bool get _canReportBranchLocation =>
+      !widget.viewOnly &&
+      widget.delegate.role == UserRole.delegate &&
+      widget.delegate.companyUID.trim().isNotEmpty &&
+      _currentPosition != null &&
+      _orgBranches.isNotEmpty;
+
+  void _showOutsideGeofence(BuildContext ctx, String message) =>
+      showGeofenceRefusalSnackBar(
+        ctx,
+        message,
+        onReport: _canReportBranchLocation ? _openBranchLocationReport : null,
+      );
+
+  Future<void> _openBranchLocationReport() async {
+    final position = _currentPosition;
+    if (position == null || !mounted) return;
+    await showReportBranchLocationSheet(
+      context: context,
+      delegate: widget.delegate,
+      branches: _orgBranches,
+      at: ReportPosition.fromPosition(position),
+      suggestedBranchId: _nearestBranch?.id,
+    );
+  }
+
   Future<void> _handleGeofenceAction({
     required bool isCheckedIn,
     required Attendance? activeAttendance,
@@ -2333,7 +2367,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           action,
         ),
       };
-      AppSnackBar.showError(parentContext, message);
+      _showOutsideGeofence(parentContext, message);
       return;
     }
 
