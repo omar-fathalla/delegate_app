@@ -5988,6 +5988,30 @@ abstract class AppLocalizations {
   /// **'Still no location: open Google Maps, wait for the blue dot to settle, then come back and try again.'**
   String get locHelpStepMapsTryAgain;
 
+  /// TAS-396 snackbar when the last known fix is too imprecise
+  ///
+  /// In en, this message translates to:
+  /// **'Your location isn\'t clear: the signal is weak inside. Stand by a door or window for a minute and try again.'**
+  String get locationWeakSignal;
+
+  /// TAS-396 location help card reason, weak signal
+  ///
+  /// In en, this message translates to:
+  /// **'Your location isn\'t clear: the signal is weak inside. Stand by a door or window for a minute and try again.'**
+  String get locHelpReasonWeakSignal;
+
+  /// TAS-396 location help card reason, no fix
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t find your location. Stand in an open area for a minute and try again.'**
+  String get locHelpReasonNoFix;
+
+  /// TAS-396 outside the geofence only because the fix is imprecise
+  ///
+  /// In en, this message translates to:
+  /// **'Your location isn\'t clear, so we can\'t tell if you\'re inside the branch. Stand by a door or window for a minute and try again.'**
+  String get attWeakSignalNearBranch;
+
   /// TAS-333 QR/branch of another chain of the delegate
   ///
   /// In en, this message translates to:

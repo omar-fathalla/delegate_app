@@ -3382,6 +3382,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Still no location: open Google Maps, wait for the blue dot to settle, then come back and try again.';
 
   @override
+  String get locationWeakSignal =>
+      'Your location isn\'t clear: the signal is weak inside. Stand by a door or window for a minute and try again.';
+
+  @override
+  String get locHelpReasonWeakSignal =>
+      'Your location isn\'t clear: the signal is weak inside. Stand by a door or window for a minute and try again.';
+
+  @override
+  String get locHelpReasonNoFix =>
+      'We couldn\'t find your location. Stand in an open area for a minute and try again.';
+
+  @override
+  String get attWeakSignalNearBranch =>
+      'Your location isn\'t clear, so we can\'t tell if you\'re inside the branch. Stand by a door or window for a minute and try again.';
+
+  @override
   String attBranchOtherChain(String chain) {
     return 'This branch belongs to $chain. Switch to that chain first, then try again.';
   }
