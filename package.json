@@ -66,6 +66,8 @@
     "test:rules:tas361-attendance-trigger": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas361 \"node --test functions/test/attendance_verify.emulator.test.js\"",
     "test:rules:tas402-photo-delete": "bash scripts/emulators_exec.sh --only firestore --project demo-tas402-photo-delete \"node --test test/rules/tas402-marketing-photo-delete.test.js\"",
     "test:rules:tas370-leave-reminders": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas370-reminders \"node --test functions/test/leave_reminders.emulator.test.js\"",
+    "test:rules:tas371-read": "bash scripts/emulators_exec.sh --only firestore --project demo-tas371-read \"node --test test/rules/tas371-server-notifications.test.js\"",
+    "test:rules:tas371-decisions": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas371 \"node --test functions/test/request_decision_notify.emulator.test.js\"",
     "test:rules:tas370-leave": "bash scripts/emulators_exec.sh --only firestore --project demo-tas370-leave \"node --test test/rules/tas370-leave-backdate.test.js\"",
     "test:rules:tas362-attendance-config": "bash scripts/emulators_exec.sh --only firestore --project demo-tas362-config \"node --test test/rules/tas362-attendance-rules-config.test.js\"",
     "test:rules:tas362-forgotten-job": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas362-job \"node --test functions/test/attendance_forgotten.emulator.test.js\"",

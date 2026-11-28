@@ -2018,20 +2018,8 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
         'resolvedAt': FieldValue.serverTimestamp(),
         'resolvedBy': widget.hrDelegate.uid,
         'resolvedByName': widget.hrDelegate.fullName,
-      });
-
-      // إرسال إشعار للمندوب
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'delegateUid': delegateUid,
-        'companyUID': widget.hrDelegate.companyUID,
-        'organizationUID': widget.hrDelegate.organizationUID,
-        'title': 'تمت الموافقة على طلب الإجازة / العذر',
-        'body': 'تم اعتماد طلبك من قِبل إدارة الشركة (${widget.hrDelegate.companyName}).',
-        'type': 'leave_approved',
-        'isRead': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'createdBy': widget.hrDelegate.uid,
-        'senderName': widget.hrDelegate.fullName,
+        // TAS-371: the server (onLeaveRequestDecided) tells the delegate.
+        'notifyByServer': true,
       });
 
       if (mounted) {
@@ -2053,7 +2041,6 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
 
   Future<void> _rejectLeave(Map<String, dynamic> leave) async {
     final docId = leave['docId']?.toString() ?? '';
-    final delegateUid = leave['delegateUid']?.toString() ?? '';
     final delegateName = leave['delegateName']?.toString() ?? '';
     final reasonCtrl = TextEditingController();
 
@@ -2103,19 +2090,8 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
         'resolvedAt': FieldValue.serverTimestamp(),
         'resolvedBy': widget.hrDelegate.uid,
         'resolvedByName': widget.hrDelegate.fullName,
-      });
-
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'delegateUid': delegateUid,
-        'companyUID': widget.hrDelegate.companyUID,
-        'organizationUID': widget.hrDelegate.organizationUID,
-        'title': 'تم رفض طلب الإجازة / العذر',
-        'body': 'تم رفض طلبك: ${reasonCtrl.text.trim()}',
-        'type': 'leave_rejected',
-        'isRead': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'createdBy': widget.hrDelegate.uid,
-        'senderName': widget.hrDelegate.fullName,
+        // TAS-371: the server (onLeaveRequestDecided) tells the delegate.
+        'notifyByServer': true,
       });
 
       if (mounted) {
