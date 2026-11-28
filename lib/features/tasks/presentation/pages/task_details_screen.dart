@@ -20,6 +20,7 @@ import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_bloc.d
 import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_event.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_bloc.dart';
 import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_event.dart';
+import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_state.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/injection_container.dart' as di;
@@ -373,6 +374,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         ),
       );
     } else {
+      // TAS-411: the delegate's save is confirmed by the bloc; a refused
+      // save puts the task back (see the BlocListener in build).
+      _revertTo = _task;
       context.read<DelegateTasksBloc>().add(
         UpdateTaskRequestedDelegate(
           organizationId: widget.organizationId,
@@ -388,10 +392,36 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       _sessionUploads.clear();
       _imageViewEpoch++;
     });
-    showTashilSnackBar(
-      context,
-      AppLocalizations.of(context)!.taskUpdatedSuccessfully,
-    );
+    if (widget.isAdmin) {
+      showTashilSnackBar(
+        context,
+        AppLocalizations.of(context)!.taskUpdatedSuccessfully,
+      );
+    }
+  }
+
+  /// TAS-411: the task as it was before the delegate's last save, put back
+  /// when the save is refused.
+  TaskEntity? _revertTo;
+
+  void _onDelegateSaveResult(BuildContext context, DelegateTasksState state) {
+    if (state is TaskStatusUpdateSuccess) {
+      _revertTo = null;
+      showTashilSnackBar(
+        context,
+        AppLocalizations.of(context)!.taskUpdatedSuccessfully,
+      );
+    } else if (state is DelegateTasksError) {
+      final back = _revertTo;
+      _revertTo = null;
+      if (back != null) {
+        setState(() {
+          _task = back;
+          _currentStatus = back.status;
+        });
+      }
+      showTashilSnackBar(context, state.message);
+    }
   }
 
   @override
@@ -406,7 +436,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           final l10n = AppLocalizations.of(context)!;
           final theme = Theme.of(context);
 
-          return Scaffold(
+          return BlocListener<DelegateTasksBloc, DelegateTasksState>(
+            listener: _onDelegateSaveResult,
+            child: Scaffold(
             appBar: AppBar(
               centerTitle: true,
               title: Text(
@@ -468,7 +500,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             body: _isEditing
                 ? _buildEditForm(context, l10n, theme)
                 : _buildReadView(context, l10n, theme),
-          );
+          ));
         },
       ),
     );

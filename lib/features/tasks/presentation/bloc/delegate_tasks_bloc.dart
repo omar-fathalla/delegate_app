@@ -215,6 +215,10 @@ class DelegateTasksBloc extends Bloc<DelegateTasksEvent, DelegateTasksState> {
               .map((t) => t.uid == event.task.uid ? event.task : t)
               .toList(),
         ));
+      } else {
+        // TAS-411: the details screen has its own bloc (no list loaded);
+        // it waits for this before saying the task was saved.
+        emit(TaskStatusUpdateSuccess(newStatus: event.task.status));
       }
       return;
     }
@@ -238,6 +242,8 @@ class DelegateTasksBloc extends Bloc<DelegateTasksEvent, DelegateTasksState> {
             return t.uid == event.task.uid ? event.task : t;
           }).toList();
           emit(currentState.copyWith(tasks: updatedTasks));
+        } else {
+          emit(TaskStatusUpdateSuccess(newStatus: event.task.status));
         }
       },
     );
