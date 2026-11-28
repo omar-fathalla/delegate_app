@@ -7,11 +7,27 @@ class AttendanceBranchRef extends Equatable {
   final String branchOrganizationUID;
   final String branchName;
 
+  /// TAS-372: what the scanned QR proves, sent to `delegateCheckIn` as `qr`:
+  /// the signed fields of a new QR, or `{legacy: true}` for an old one.
+  /// Null when the branch did not come from a QR (geofence mode). Not part of
+  /// the branch identity (not in [props]).
+  final Map<String, dynamic>? qrProof;
+
   const AttendanceBranchRef({
     this.branchId,
     required this.branchOrganizationUID,
     required this.branchName,
+    this.qrProof,
   });
+
+  /// The same branch with the scanned QR's proof attached.
+  AttendanceBranchRef withQrProof(Map<String, dynamic>? proof) =>
+      AttendanceBranchRef(
+        branchId: branchId,
+        branchOrganizationUID: branchOrganizationUID,
+        branchName: branchName,
+        qrProof: proof,
+      );
 
   factory AttendanceBranchRef.fromBranch(
     Branch branch, {
@@ -80,6 +96,24 @@ class AttendanceBranchRef extends Equatable {
 
   @override
   List<Object?> get props => [branchId, branchOrganizationUID, branchName];
+}
+
+/// TAS-372: the proof of a scanned attendance QR map. A server-signed QR
+/// (`sig` + `qrVersion`) sends its signed fields; any other QR (old JSON or a
+/// plain branch name, pass null) is `{legacy: true}`.
+Map<String, dynamic> attendanceQrProof(Map<String, dynamic>? qr) {
+  final sig = qr?['sig'];
+  final version = qr?['qrVersion'];
+  if (qr == null || sig is! String || sig.trim().isEmpty || version is! int) {
+    return const {'legacy': true};
+  }
+  return {
+    'v': qr['v'],
+    'branchId': (qr['branchId'] as String?)?.trim() ?? '',
+    'organizationUID': (qr['organizationUID'] as String?)?.trim() ?? '',
+    'qrVersion': version,
+    'sig': sig.trim(),
+  };
 }
 
 bool attendanceSameBranch(

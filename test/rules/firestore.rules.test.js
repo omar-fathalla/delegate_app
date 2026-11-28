@@ -439,6 +439,32 @@ describe("firestore tightened rules", () => {
     }));
   });
 
+  test("TAS-372: only delegateCheckIn writes qrCheck / qrVersion / deviceIntegrity", async () => {
+    const delegate = dbFor("del-1", DELEGATE);
+    const base = {
+      timestamp: SERVER_TS(),
+      delegateId: "del-1",
+      userId: "del-1",
+      organizationId: "o1",
+      companyId: "c1",
+      type: "check_in",
+    };
+    for (const extra of [{deviceIntegrity: "verified"}, {qrCheck: "signed"}, {qrVersion: 3}]) {
+      await assertFails(delegate.collection("attendance_logs").add({...base, ...extra}));
+      await assertFails(delegate.collection("organizations/o1/attendance_logs").add({...base, ...extra}));
+    }
+    await assertSucceeds(delegate.collection("attendance_logs").add(base));
+    // Owner update stays limited to the check-out fields.
+    await assertFails(delegate.doc("attendance_logs/a1").update({deviceIntegrity: "verified"}));
+    // Staff in scope edit the record, but never the server marks.
+    const comp = dbFor("comp");
+    await assertSucceeds(comp.doc("attendance_logs/a1").update({adjustmentNotes: "ok"}));
+    await assertFails(comp.doc("attendance_logs/a1").update({qrCheck: "signed"}));
+    await assertFails(comp.collection("attendance_logs").add({
+      delegateId: "del-1", organizationId: "o1", companyId: "c1", deviceIntegrity: "verified",
+    }));
+  });
+
   test("tasks stay inside the delegate organization", async () => {
     const delegate = dbFor("del-1", DELEGATE);
     await assertSucceeds(

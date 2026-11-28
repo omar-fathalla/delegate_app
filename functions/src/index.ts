@@ -374,6 +374,6 @@ export {markForgottenAttendance} from "./attendance_forgotten";
 export {remindPendingLeaves} from "./leave_reminders";
 export {onLeaveRequestDecided, onUnbindRequestDecided} from "./request_decision_notify";
 export {onBranchLocationReportWritten} from "./branch_location_report_notify";
-export {delegateCheckIn, delegateCheckOut} from "./attendance_callables";
+export {delegateCheckIn, delegateCheckOut, branchAttendanceQr} from "./attendance_callables";
 export {requestDelegatePhoneChange, confirmDelegatePhoneChange} from "./delegate_phone_change";
 export {onDelegateStatsWrite} from "./delegate_stats";
