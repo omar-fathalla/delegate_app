@@ -58,11 +58,19 @@ const _supervisorMenu = [
   'الرواتب',
   'تدقيق الأمان',
   'فك الأجهزة',
+  // TAS-397: company supervisor only (HR does not get it).
+  'أماكن الفروع',
   'المهام',
   'لائحة الغرامات',
   'نظام الغرامات',
   'الإعدادات',
 ];
+
+/// The menu [role] sees: HR does not get «أماكن الفروع» (TAS-397, user
+/// decision 28 Nov: only the company supervisor reviews branch reports).
+List<String> _menuFor(UserRole role) => role == UserRole.admin
+    ? _supervisorMenu
+    : _supervisorMenu.where((t) => t != 'أماكن الفروع').toList();
 
 const _webOnlyTitles = [
   'الرئيسية',
@@ -146,7 +154,7 @@ void main() {
       test('$role compact menu lists every supervisor tool once', () {
         final titles = _titles(_delegate(role), HrShellPlacement.compactMenu);
         expect(titles.toSet(), titles.toList().toSet());
-        expect(titles, _supervisorMenu);
+        expect(titles, _menuFor(role));
         expect(titles.last, 'الإعدادات');
         expect(titles[titles.length - 2], 'نظام الغرامات');
       });
@@ -155,7 +163,7 @@ void main() {
         final titles = _titles(_delegate(role), HrShellPlacement.sidebar);
         expect(
           titles,
-          _supervisorMenu.where(
+          _menuFor(role).where(
             (title) => title != 'الإعدادات' && title != 'الملف الشخصي',
           ),
         );

@@ -755,6 +755,33 @@ void main() {
       },
     );
 
+    test(
+      'outside the branch (GeofenceOutsideFailure, TAS-397) is dropped too',
+      () async {
+        await checkIn();
+        online = true;
+        // attendanceServerError maps reason outside_branch to this type.
+        mockRemote.sendOfflineActionStub = (a) async {
+          throw attendanceServerError('failed-precondition', {
+            'reason': 'outside_branch',
+            'message': 'إنت برّه نطاق الفرع.',
+            'distanceMeters': 300,
+            'allowedMeters': 100,
+          }, null);
+        };
+        final result = await offlineRepo.syncPendingAttendance(userId: 'u1');
+        expect(
+          result,
+          Left(
+            OfflineAttendanceRejected(
+              offlineRecordRejectedMessage('إنت برّه نطاق الفرع.'),
+            ),
+          ),
+        );
+        expect(mockQueue.pendingCount('u1'), 0);
+      },
+    );
+
     test('signed out / other failures keep the queue', () async {
       await checkIn();
       online = true;

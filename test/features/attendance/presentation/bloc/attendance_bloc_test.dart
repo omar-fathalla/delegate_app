@@ -154,6 +154,39 @@ void main() {
         const AttendanceError(message: 'أنت خارج نطاق الفرع'),
       ],
     );
+
+    blocTest<AttendanceBloc, AttendanceState>(
+      'TAS-397: a typed geofence refusal is flagged for «الفرع مكانه غلط؟»',
+      build: () {
+        when(() => mockCheckIn(any())).thenAnswer(
+          (_) async => const Left(
+            GeofenceOutsideFailure(
+              'أنت خارج نطاق الفرع (4200 متر).',
+              distanceMeters: 4200,
+              allowedMeters: 150,
+            ),
+          ),
+        );
+        return bloc;
+      },
+      act: (bloc) => bloc.add(
+        const CheckInRequested(
+          userId: 'user-1',
+          companyId: 'comp-1',
+          organizationId: 'org-1',
+          deviceInfo: 'Samsung Galaxy',
+          lat: 25.0,
+          long: 30.0,
+        ),
+      ),
+      expect: () => [
+        AttendanceLoading(),
+        const AttendanceError(
+          message: 'أنت خارج نطاق الفرع (4200 متر).',
+          outsideGeofence: true,
+        ),
+      ],
+    );
   });
 
   group('CheckOutRequested', () {

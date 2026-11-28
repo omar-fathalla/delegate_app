@@ -27,7 +27,10 @@ const int kHrTabPhotoPermissions = 12;
 const int kHrTabPenaltyCatalog = 13;
 const int kHrTabPenalties = 14;
 const int kHrTabOverview = 15;
-const int kHrShellTabCount = 16;
+
+/// «بلاغات أماكن الفروع» (TAS-397): company supervisors only.
+const int kHrTabBranchReports = 16;
+const int kHrShellTabCount = 17;
 
 /// The tab `/hr/home` opens on. Web lands on the overview; mobile keeps the
 /// attendance tab.
@@ -66,6 +69,10 @@ class HrShellItem {
   final bool destructive;
   final bool requiresRenewalPermission;
 
+  /// Shown only to the company supervisor ([UserRole.admin]); HR on the same
+  /// shell does not get it (TAS-397, user decision 28 Nov).
+  final bool companySupervisorOnly;
+
   const HrShellItem({
     required this.id,
     required this.title,
@@ -80,6 +87,7 @@ class HrShellItem {
     this.webOnly = false,
     this.destructive = false,
     this.requiresRenewalPermission = false,
+    this.companySupervisorOnly = false,
   });
 
   /// Menu label. Web uses [webTitle] when one is set; mobile keeps [title].
@@ -233,6 +241,18 @@ const List<HrShellItem> kHrShellCatalog = [
     badgeCollection: 'device_unbind_requests',
   ),
   HrShellItem(
+    id: 'branch_location_reports',
+    webSlug: 'branch-reports',
+    title: 'بلاغات أماكن الفروع',
+    webTitle: 'أماكن الفروع',
+    subtitle: 'بلاغات المناديب إن مكان الفرع غلط',
+    section: 'الرقابة والأدوات',
+    icon: Icons.wrong_location_outlined,
+    selectedIcon: Icons.wrong_location_rounded,
+    tabIndex: kHrTabBranchReports,
+    companySupervisorOnly: true,
+  ),
+  HrShellItem(
     id: 'tasks',
     webSlug: 'tasks',
     title: 'المهام',
@@ -318,6 +338,9 @@ List<HrShellItem> hrShellItems({
   final visible = <HrShellItem>[];
   for (final item in kHrShellCatalog) {
     if (item.webOnly && !isWeb) continue;
+    if (item.companySupervisorOnly && delegate.role != UserRole.admin) {
+      continue;
+    }
     if (item.requiresRenewalPermission &&
         !canCreateSubscriptionRenewal(
           role: delegate.role,

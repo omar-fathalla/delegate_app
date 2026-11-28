@@ -126,9 +126,15 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
 
     if (distance > allowedRadius) {
       final action = isCheckIn ? 'تسجيل الحضور' : 'تسجيل الانصراف';
-      throw ServerFailure(
+      // TAS-397: typed, so the screen can offer «الفرع مكانه غلط؟». Same
+      // text as before.
+      throw GeofenceOutsideFailure(
         'أنت خارج نطاق الفرع (${distance.toInt()} متر). '
         'النطاق المسموح: ${allowedRadius.toInt()} متر لـ$action.',
+        distanceMeters: distance,
+        allowedMeters: allowedRadius,
+        branchId: branch.id.isEmpty ? branchRef.branchId : branch.id,
+        branchName: branchRef.branchName,
       );
     }
   }
@@ -701,7 +707,12 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       try {
         await remoteDataSource.sendOfflineAction(a);
         await offlineQueue.remove(uid, a.id);
-      } on AttendanceServerRefused catch (f) {
+      } on ServerFailure catch (f) {
+        // Refused on purpose: AttendanceServerRefused, or outside the branch
+        // (GeofenceOutsideFailure, TAS-397). Other server failures retry.
+        if (f is! AttendanceServerRefused && f is! GeofenceOutsideFailure) {
+          return const Left(NetworkFailure(kOfflineSyncRetryMessage));
+        }
         await offlineQueue.remove(uid, a.id);
         if (a.isCheckIn) droppedCheckIns.add(a.id);
         rejected.add(f.message);

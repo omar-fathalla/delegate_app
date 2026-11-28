@@ -1769,6 +1769,78 @@ allow delete: if isGlobalStaff()
 || (isOrgAdmin() && callerOrg() != ''
 && resource.data.get('organizationUID', '') == callerOrg());
 }
+match /branch_location_reports/{reportId} {
+function blrDelegateKeys() {
+return ['delegateId', 'delegateName', 'companyUID', 'organizationUID',
+'branchId', 'branchName', 'branchLat', 'branchLng', 'branchRadius',
+'lat', 'lng', 'accuracy', 'isMocked', 'distanceMeters', 'note',
+'status', 'createdAt'];
+}
+function blrDelegateWriteOk() {
+let d = request.resource.data;
+return isDelegate()
+&& d.keys().hasOnly(blrDelegateKeys())
+&& d.keys().hasAll(['delegateId', 'companyUID', 'organizationUID',
+'branchId', 'lat', 'lng', 'status', 'createdAt'])
+&& d.delegateId is string && d.delegateId != '' && isSelfId(d.delegateId)
+&& d.branchId is string && d.branchId != ''
+&& reportId == d.delegateId + '_' + d.branchId
+&& d.companyUID is string && delegateInCompany(d.companyUID)
+&& d.organizationUID is string && delegateInOrg(d.organizationUID)
+&& d.lat is number && d.lng is number
+&& d.status == 'open'
+&& d.createdAt == request.time
+&& d.get('note', '') is string && d.get('note', '').size() <= 500;
+}
+function blrStaffReadOk() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let co = stringOr(u.get('companyUID', ''), claimString('companyId'));
+let org = orgOf(u);
+let d = resource.data;
+return r in staffRoleListGlobal()
+|| (r in companyAdminRoles() && co != '' && co == d.get('companyUID', ''))
+|| (r in orgAdminRoleList() && org != '' && org == d.get('organizationUID', '')
+&& d.get('status', '') in ['forwarded', 'fixed']);
+}
+function blrStaffUpdateOk() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let co = stringOr(u.get('companyUID', ''), claimString('companyId'));
+let org = orgOf(u);
+let b = resource.data;
+let a = request.resource.data;
+let keys = a.diff(b).affectedKeys();
+let from = b.get('status', '');
+let to = a.get('status', '');
+let reasonOk = to != 'rejected'
+|| (a.get('rejectReason', '') is string
+&& a.get('rejectReason', '').size() > 0
+&& a.get('rejectReason', '').size() <= 500);
+return reasonOk && (
+(r in companyAdminRoles() && co != '' && co == b.get('companyUID', '')
+&& from == 'open' && to in ['forwarded', 'rejected']
+&& keys.hasOnly(['status', 'reviewedBy', 'reviewedByName',
+'reviewedAt', 'rejectReason', 'updatedAt'])
+&& a.get('reviewedBy', '') == request.auth.uid
+&& a.get('reviewedAt', null) == request.time)
+|| ((r in staffRoleListGlobal()
+|| (r in orgAdminRoleList() && org != '' && org == b.get('organizationUID', '')))
+&& from == 'forwarded' && to in ['fixed', 'rejected']
+&& keys.hasOnly(['status', 'fixedBy', 'fixedByName', 'fixedAt',
+'fixNote', 'rejectReason', 'updatedAt'])
+&& a.get('fixedBy', '') == request.auth.uid
+&& a.get('fixedAt', null) == request.time));
+}
+allow read: if signedIn() && (
+(isDelegate() && isSelfId(resource.data.get('delegateId', '')))
+|| (staffToken() && blrStaffReadOk()));
+allow create: if blrDelegateWriteOk();
+allow update: if signedIn() && (
+(isDelegate() && resource.data.get('status', '') in ['rejected', 'fixed']
+&& blrDelegateWriteOk())
+|| (staffToken() && blrStaffUpdateOk()));
+}
 match /counters/{counterId} {
 allow read: if isStaffWriter();
 allow create: if isStaffWriter()

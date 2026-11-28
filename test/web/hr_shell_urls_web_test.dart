@@ -49,6 +49,7 @@ const _slugs = <int, String>{
   kHrTabPayroll: '/hr/payroll',
   kHrTabFraud: '/hr/security',
   kHrTabDevices: '/hr/devices',
+  kHrTabBranchReports: '/hr/branch-reports',
   kHrTabTasks: '/hr/tasks',
   kHrTabPenaltyCatalog: '/hr/penalties/rules',
   kHrTabPenalties: '/hr/penalties',

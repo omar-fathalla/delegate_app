@@ -5,6 +5,7 @@ import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/admin/presentation/pages/anti_fraud_audit_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
+import 'package:delegate_app/features/branch_reports/presentation/branch_location_reports_screen.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_device_unbind_requests_screen.dart';
@@ -92,6 +93,8 @@ Widget hrShellTab({
       return PenaltyRulesCatalogPage(currentDelegate: delegate);
     case kHrTabPenalties:
       return HrPenaltiesHost(admin: delegate);
+    case kHrTabBranchReports:
+      return BranchLocationReportsScreen(viewer: delegate, showAppBar: false);
     case kHrTabOverview:
       if (!WebRuntimePolicy.isWeb) return const SizedBox.shrink();
       return HrHomeOverviewWeb(
