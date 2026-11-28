@@ -111,7 +111,7 @@ class MockAttendanceRepository implements AttendanceRepository {
   }
 
   @override
-  Future<Either<Failure, void>> syncPendingAttendance() async {
+  Future<Either<Failure, void>> syncPendingAttendance({String? userId}) async {
     return const Right(null);
   }
 

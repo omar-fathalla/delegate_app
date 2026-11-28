@@ -2644,6 +2644,7 @@ allow create, update: if isGlobalStaff() || isMarketing() || isBranchesMarketing
 allow delete: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin();
 }
 match /company_payroll_configs/{companyId} {
+allow get: if delegateInCompany(companyId);
 allow read, write: if isGlobalStaff()
 || (companyId == callerCompany() && (isHR() || isAccountant() || isCompanyAdmin() || isOrgAdmin()));
 }

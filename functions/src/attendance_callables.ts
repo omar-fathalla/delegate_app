@@ -15,6 +15,15 @@
  * Idempotent: the check-in id is the app's requestId, the check-out id is
  * `${attendanceId}_out`, so a retry after a timeout never writes twice.
  *
+ * Offline records (TAS-363): the app saves a check-in / check-out on the
+ * phone without network and sends it later with `offline: true`,
+ * `capturedAtMs`, `timeTrusted`, `syncedAtMs`. The same checks run at the
+ * captured time; hours count right away (user decision 27 Nov) from the
+ * captured time when it is trusted and inside the limits
+ * (decideOfflineTime), otherwise from the time the record reached the server
+ * (HR can adjust). The record is flagged `offlineCheckIn` / `offlineCheckOut`
+ * for HR review, never refused for its time.
+ *
  * Deploy (named only, tashil-dev first, prod with the release):
  *   functions:tashil-mobile-notifications:delegateCheckIn,
  *   functions:tashil-mobile-notifications:delegateCheckOut
@@ -28,10 +37,15 @@ import {
   Doc,
   Refusal,
   RecentLog,
+  CheckOutInput,
+  OfflineTime,
   buildCheckInDoc,
   checkOutDistance,
   decideCheckIn,
   decideCheckOut,
+  decideOfflineTime,
+  lastRecordEndMs,
+  offlineFields,
   parseCheckIn,
   parseCheckOut,
   refuse,
@@ -167,22 +181,32 @@ export const delegateCheckIn = functions
         const e = existing.data() || {};
         // A retry of a check-in that already landed.
         if (selfIds.includes(String(e.delegateId || "")) && e.type === "check_in") {
-          return {ok: true as const, already: true, distanceMeters: null as number | null};
+          return {ok: true as const, already: true, distanceMeters: null as number | null,
+            offline: null as OfflineTime | null};
         }
         return refuse("bad_request");
       }
       const recent = await recentLogs(tx, db, selfIds);
-      const decision = decideCheckIn({input, token, membership, branch, recent, nowMs: Date.now()});
+      const nowMs = Date.now();
+      const offline: OfflineTime | null = input.offline ?
+        decideOfflineTime(input.offline, nowMs, lastRecordEndMs(recent)) : null;
+      const decision = decideCheckIn({input, token, membership, branch, recent, nowMs: offline ? offline.atMs : nowMs});
       if (!decision.ok) return decision;
+      const serverNow = admin.firestore.FieldValue.serverTimestamp();
       tx.create(ref, {
         ...buildCheckInDoc(input, delegateId),
         // TAS-372: server-only marks (the rules refuse them from clients).
         qrCheck: qr.qrCheck,
         ...(qr.qrVersion != null ? {qrVersion: qr.qrVersion} : {}),
         deviceIntegrity,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: offline?.trusted ? admin.firestore.Timestamp.fromMillis(offline.atMs) : serverNow,
+        ...(input.offline && offline ? {
+          offlineCheckIn: true,
+          receivedAt: serverNow,
+          ...offlineFields("", input.offline, offline, (ms) => admin.firestore.Timestamp.fromMillis(ms)),
+        } : {}),
       });
-      return {ok: true as const, already: false, distanceMeters: decision.distanceMeters};
+      return {ok: true as const, already: false, distanceMeters: decision.distanceMeters, offline};
     });
 
     if (isRefusal(result)) {
@@ -190,7 +214,13 @@ export const delegateCheckIn = functions
         distance: result.distanceMeters});
       fail(result);
     }
-    return {ok: true, attendanceId: ref.id, already: result.already, distanceMeters: result.distanceMeters};
+    return {
+      ok: true,
+      attendanceId: ref.id,
+      already: result.already,
+      distanceMeters: result.distanceMeters,
+      ...(result.offline ? {timeTrusted: result.offline.trusted, countedFromMs: result.offline.atMs} : {}),
+    };
   });
 
 /** The branch doc ref (nested under its chain first, then root). */
@@ -273,7 +303,7 @@ export const delegateCheckOut = functions
     const token = requireAuth(context);
     const parsed = parseCheckOut(data);
     if (isRefusal(parsed)) fail(parsed, "invalid-argument");
-    const input = parsed as {attendanceId: string; lat: number | null; lng: number | null};
+    const input = parsed as CheckOutInput;
     const selfIds = callerSelfIds(context.auth?.uid, token);
     const db = admin.firestore();
     const inRef = db.collection("attendance_logs").doc(input.attendanceId);
@@ -295,7 +325,13 @@ export const delegateCheckOut = functions
       if (!decision.ok) return decision;
       if (decision.already) return {ok: true as const, already: true};
       const r = record as Record<string, unknown>;
-      const now = admin.firestore.FieldValue.serverTimestamp();
+      const serverNow = admin.firestore.FieldValue.serverTimestamp();
+      // TAS-363: an offline check-out counts from its captured time when
+      // trusted and after the check-in, else from now.
+      const offline: OfflineTime | null = input.offline ?
+        decideOfflineTime(input.offline, Date.now(), toMs(r.timestamp)) : null;
+      const now = offline?.trusted ? admin.firestore.Timestamp.fromMillis(offline.atMs) : serverNow;
+      const ts = (ms: number) => admin.firestore.Timestamp.fromMillis(ms);
       const location = {latitude: input.lat, longitude: input.lng};
       const outDoc: Record<string, unknown> = {
         delegateId: r.delegateId ?? r.userId,
@@ -311,12 +347,19 @@ export const delegateCheckOut = functions
       for (const k of ["branchName", "branchId", "branchOrganizationUID"]) {
         if (r[k] != null) outDoc[k] = r[k];
       }
-      tx.set(outRef, outDoc);
-      tx.update(inRef, {
+      const inUpdate: Record<string, unknown> = {
         checkOutTime: now,
         checkOutLocation: location,
         checkOutDocId: outRef.id,
-      });
+      };
+      if (input.offline && offline) {
+        Object.assign(outDoc, {offlineCheckOut: true, receivedAt: serverNow},
+          offlineFields("", input.offline, offline, ts));
+        Object.assign(inUpdate, {offlineCheckOut: true, checkOutReceivedAt: serverNow},
+          offlineFields("checkOut", input.offline, offline, ts));
+      }
+      tx.set(outRef, outDoc);
+      tx.update(inRef, inUpdate as FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData>);
       return {ok: true as const, already: false};
     });
 

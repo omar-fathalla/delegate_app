@@ -82,11 +82,15 @@ class MockAttendanceRepository implements AttendanceRepository {
     String? nationalityID,
     String? phoneNumber,
   }) async {
-    return Right(mockPaginatedItems
-        .where((a) =>
-            a.checkInTime.year == month.year &&
-            a.checkInTime.month == month.month)
-        .toList());
+    return Right(
+      mockPaginatedItems
+          .where(
+            (a) =>
+                a.checkInTime.year == month.year &&
+                a.checkInTime.month == month.month,
+          )
+          .toList(),
+    );
   }
 
   @override
@@ -99,8 +103,8 @@ class MockAttendanceRepository implements AttendanceRepository {
     final filtered = organizationId.isEmpty
         ? mockPaginatedItems
         : mockPaginatedItems
-            .where((a) => a.organizationId == organizationId)
-            .toList();
+              .where((a) => a.organizationId == organizationId)
+              .toList();
     return Right(filtered);
   }
 
@@ -116,8 +120,8 @@ class MockAttendanceRepository implements AttendanceRepository {
     final filtered = organizationId.isEmpty
         ? mockPaginatedItems
         : mockPaginatedItems
-            .where((a) => a.organizationId == organizationId)
-            .toList();
+              .where((a) => a.organizationId == organizationId)
+              .toList();
     if (pageLimit != null && filtered.length > pageLimit!) {
       final sorted = [...filtered]
         ..sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
@@ -149,7 +153,7 @@ class MockAttendanceRepository implements AttendanceRepository {
   }
 
   @override
-  Future<Either<Failure, void>> syncPendingAttendance() async {
+  Future<Either<Failure, void>> syncPendingAttendance({String? userId}) async {
     return const Right(null);
   }
 
@@ -337,10 +341,7 @@ void main() {
           locale: const Locale('ar'),
           localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: AttendanceScreen(
-            delegate: multiChainDelegate,
-            viewOnly: false,
-          ),
+          home: AttendanceScreen(delegate: multiChainDelegate, viewOnly: false),
         ),
       );
       await tester.pumpAndSettle();
@@ -357,7 +358,10 @@ void main() {
 
       // TAS-387: month progress bar, and the duration as hh:mm (each fake
       // session lasts exactly one hour).
-      expect(find.byKey(const Key('attendance_month_progress')), findsOneWidget);
+      expect(
+        find.byKey(const Key('attendance_month_progress')),
+        findsOneWidget,
+      );
       expect(find.textContaining('01:00'), findsWidgets);
 
       // TAS-387: chain then branch filter, as two DropdownMenus.
@@ -373,7 +377,14 @@ void main() {
       // TAS-387: choose the chain from the chain DropdownMenu.
       await tester.tap(find.byKey(const Key('attendance_chain_menu')));
       await tester.pumpAndSettle();
-      await tester.tap(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('فتح الله ماركت')).last);
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(MenuItemButton),
+              matching: find.textContaining('فتح الله ماركت'),
+            )
+            .last,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('City Square'), findsOneWidget);
@@ -384,7 +395,14 @@ void main() {
       // TAS-387: choose the chain from the chain DropdownMenu.
       await tester.tap(find.byKey(const Key('attendance_chain_menu')));
       await tester.pumpAndSettle();
-      await tester.tap(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('جملة ماركت')).last);
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(MenuItemButton),
+              matching: find.textContaining('جملة ماركت'),
+            )
+            .last,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('جناكليس'), findsOneWidget);
@@ -395,7 +413,14 @@ void main() {
       // TAS-387: choose the chain from the chain DropdownMenu.
       await tester.tap(find.byKey(const Key('attendance_chain_menu')));
       await tester.pumpAndSettle();
-      await tester.tap(find.descendant(of: find.byType(MenuItemButton), matching: find.textContaining('كل السلاسل')).last);
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(MenuItemButton),
+              matching: find.textContaining('كل السلاسل'),
+            )
+            .last,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('جناكليس'), findsOneWidget);
@@ -486,10 +511,7 @@ void main() {
           locale: const Locale('ar'),
           localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: AttendanceScreen(
-            delegate: multiChainDelegate,
-            viewOnly: false,
-          ),
+          home: AttendanceScreen(delegate: multiChainDelegate, viewOnly: false),
         ),
       );
       await tester.pumpAndSettle();
@@ -527,36 +549,36 @@ void main() {
       mockAttendanceRepository.pageLimit = 20;
 
       final oldDelegate = Delegate(
-      uid: '1',
-      firstName: 'Test',
-      middleName: 'User',
-      lastName: 'Name',
-      fullName: 'Test User Name',
-      nationalityID: '1234567890',
-      motherName: 'Mother Name',
-      city: 'City',
-      phoneNumber: '1234567890',
-      gender: DelegateGender.male,
-      position: DelegatePosition.promoter,
-      birthDate: DateTime(1990, 1, 1),
-      organizationUID: 'org1',
-      organizationName: 'Org Name',
-      companyUID: 'comp1',
-      companyName: 'Comp Name',
-      status: DelegateStatus.active,
-      delegatePublicId: 'DEL-123',
-      allReceiptCodes: const [],
-      createdAt: DateTime(2020, 1, 1),
-      createdBy: 'admin',
-      hasPendingUpdate: false,
-      isDeductedFromCompany: false,
-      isPrinted: false,
-      isProfileComplete: true,
-      numberOfDocuments: 0,
-      paymentAmount: 0,
-      version: 1,
-      documents: const [],
-    );      // Same shared calculation the home summary uses.
+        uid: '1',
+        firstName: 'Test',
+        middleName: 'User',
+        lastName: 'Name',
+        fullName: 'Test User Name',
+        nationalityID: '1234567890',
+        motherName: 'Mother Name',
+        city: 'City',
+        phoneNumber: '1234567890',
+        gender: DelegateGender.male,
+        position: DelegatePosition.promoter,
+        birthDate: DateTime(1990, 1, 1),
+        organizationUID: 'org1',
+        organizationName: 'Org Name',
+        companyUID: 'comp1',
+        companyName: 'Comp Name',
+        status: DelegateStatus.active,
+        delegatePublicId: 'DEL-123',
+        allReceiptCodes: const [],
+        createdAt: DateTime(2020, 1, 1),
+        createdBy: 'admin',
+        hasPendingUpdate: false,
+        isDeductedFromCompany: false,
+        isPrinted: false,
+        isProfileComplete: true,
+        numberOfDocuments: 0,
+        paymentAmount: 0,
+        version: 1,
+        documents: const [],
+      ); // Same shared calculation the home summary uses.
       final expected = MonthlyAttendanceStats.compute(
         sessions: items,
         month: prevMonth,

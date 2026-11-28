@@ -24,6 +24,7 @@ import 'package:delegate_app/features/tracking/data/services/delegate_tracking_e
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/core/security/delegate_identity.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_server_api.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
 
 abstract class AttendanceRemoteDataSource {
   Future<AttendanceModel> checkIn(
@@ -95,8 +96,13 @@ abstract class AttendanceRemoteDataSource {
     String organizationId,
   );
 
-  /// Syncs an offline queue of attendance actions to Firestore.
-  Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue);
+  /// TAS-363: sends one check-in / check-out saved on the phone without
+  /// network, through `delegateCheckIn` / `delegateCheckOut` (never a direct
+  /// write). Returns when the server wrote it or had it already; throws a
+  /// [ServerFailure] with the server's message when it was refused (the item
+  /// is dropped), and [AttendanceServerUncertain] /
+  /// [AttendanceServerUnavailable] when it must stay queued.
+  Future<void> sendOfflineAction(OfflineAttendanceAction action);
 
   /// Fetches branch details by name (legacy; prefer [resolveBranch]).
   Future<Map<String, dynamic>?> getBranchByName(String branchName);
@@ -352,11 +358,13 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     double long,
   ) async {
     try {
-      final checkInRef = _attendanceCollection(organizationId)
-          .doc(attendanceId);
+      final checkInRef = _attendanceCollection(
+        organizationId,
+      ).doc(attendanceId);
       // Deterministic ID: repeating the same check-out can't add a 2nd record.
-      final outRef = _attendanceCollection(organizationId)
-          .doc('${attendanceId}_out');
+      final outRef = _attendanceCollection(
+        organizationId,
+      ).doc('${attendanceId}_out');
 
       // Decide on the server only, never on the offline cache.
       final DocumentSnapshot<Map<String, dynamic>> lastCheckInSnapshot;
@@ -1142,73 +1150,14 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   }
 
   @override
-  Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue) async {
-    try {
-      final batch = firestore.batch();
-      for (var action in queue) {
-        final organizationId = action['organizationId'] as String? ?? '';
-        final newDocRef = _attendanceCollection(organizationId).doc();
-        final Map<String, dynamic> data = {
-          'delegateId': action['delegateId'],
-          'userId': action['delegateId'],
-          'companyId': action['companyId'],
-          'organizationId': organizationId,
-          'timestamp': FieldValue.serverTimestamp(),
-          'type': action['type'],
-          'location': action['location'],
-        };
-
-        if (action['deviceInfo'] != null) {
-          data['deviceInfo'] = action['deviceInfo'];
-        }
-        if (action['branchName'] != null) {
-          data['branchName'] = action['branchName'];
-        }
-        if (action['branchId'] != null) {
-          data['branchId'] = action['branchId'];
-        }
-        if (action['branchOrganizationUID'] != null) {
-          data['branchOrganizationUID'] = action['branchOrganizationUID'];
-        }
-        if (action['relatedCheckInId'] != null) {
-          data['relatedCheckInId'] = action['relatedCheckInId'];
-        }
-        // Fix3: pass through denormalized display fields when queued offline.
-        for (final key in [
-          'delegateName',
-          'phoneNumber',
-          'companyName',
-          'personalPhotoURL',
-        ]) {
-          final v = action[key];
-          if (v is String && v.trim().isNotEmpty) {
-            data[key] = v.trim();
-          }
-        }
-
-        batch.set(newDocRef, data);
-
-        // Denormalize checkout onto the related check-in (fix2).
-        if (action['type'] == 'check_out' &&
-            action['relatedCheckInId'] is String &&
-            (action['relatedCheckInId'] as String).isNotEmpty) {
-          final relatedId = action['relatedCheckInId'] as String;
-          batch.update(_attendanceCollection(organizationId).doc(relatedId), {
-            'checkOutTime': FieldValue.serverTimestamp(),
-            'checkOutDocId': newDocRef.id,
-            if (action['location'] != null)
-              'checkOutLocation': action['location'],
-          });
-        }
-      }
-
-      await batch.commit().timeout(const Duration(seconds: 20));
-    } on FirebaseException catch (e) {
-      throwFirestoreFailure(e, 'فشل في مزامنة البيانات المؤجلة.');
-    } on TimeoutException {
-      throwTimeoutFailure('انتهت مهلة الاتصال بالخادم أثناء المزامنة.');
-    } catch (_) {
-      throwUnexpectedFailure('حدث خطأ غير متوقع أثناء المزامنة.');
+  Future<void> sendOfflineAction(OfflineAttendanceAction action) async {
+    final api = serverApi;
+    if (api == null) throw const AttendanceServerUnavailable();
+    final data = action.toCallableData();
+    if (action.isCheckIn) {
+      await api.checkIn(data);
+    } else {
+      await api.checkOut(data);
     }
   }
 

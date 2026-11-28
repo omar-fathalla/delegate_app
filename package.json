@@ -73,8 +73,12 @@
     "test:rules:tas362-forgotten-job": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas362-job \"node --test functions/test/attendance_forgotten.emulator.test.js\"",
     "test:rules:tas361-attendance-callables": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas361b \"node --test functions/test/attendance_callables.emulator.test.js\"",
     "test:rules:tas372-attendance-qr": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas372 \"node --test functions/test/attendance_qr.emulator.test.js\"",
+    "test:rules:tas363-offline-attendance": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas363 \"node --test functions/test/attendance_offline.emulator.test.js\"",
     "test:rules:tas368-completions": "bash scripts/emulators_exec.sh --only firestore --project demo-tas368 \"node --test test/rules/tas368-task-completions.test.js\"",
-    "test:rules:tas369-photos": "bash scripts/emulators_exec.sh --only firestore --project demo-tas369 \"node --test test/rules/tas369-captured-photos-create.test.js\""
+    "test:rules:tas369-photos": "bash scripts/emulators_exec.sh --only firestore --project demo-tas369 \"node --test test/rules/tas369-captured-photos-create.test.js\"",
+    "test:rules:tas365-penalty-notify": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only firestore --project demo-tas365 \"node --test functions/test/penalty_delegate_notify.emulator.test.js\"",
+    "test:rules:tas365-penalty-rules": "bash scripts/emulators_exec.sh --only firestore --project demo-tas365-rules \"node --test test/rules/tas365-penalty-dispute.test.js\"",
+    "test:rules:tas366-payroll": "bash scripts/emulators_exec.sh --only firestore --project demo-tas366-payroll \"node --test test/rules/tas366-payroll-config-read.test.js\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

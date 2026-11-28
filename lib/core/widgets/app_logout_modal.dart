@@ -14,6 +14,8 @@ import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bl
 import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
 
 /// Logout confirmation (TAS-350, m3-kit C-27): a basic M3 [AlertDialog]
 /// opened with [showTashilDialog] on every window size and for every role.
@@ -61,6 +63,19 @@ class _LogoutDialogState extends State<_LogoutDialog> {
       return 0;
     }
   }
+
+  /// TAS-363: attendance of this delegate saved offline and not sent yet.
+  /// Kept on the phone for the same delegate's next sign-in.
+  int get _pendingAttendance {
+    try {
+      if (!sl.isRegistered<AttendanceOfflineQueue>()) return 0;
+      return sl<AttendanceOfflineQueue>().pendingCount(widget.delegate.uid);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  bool get _hasPending => _pendingPhotos > 0 || _pendingAttendance > 0;
 
   Future<void> _handleLogout() async {
     if (_isLoggingOut) return;
@@ -130,16 +145,30 @@ class _LogoutDialogState extends State<_LogoutDialog> {
       child: AlertDialog(
         icon: const Icon(Icons.logout_rounded),
         title: Text(l10n.logoutDialogTitle),
-        content: _pendingPhotos > 0
-            ? Text(
-                l10n.logoutPendingPhotosWarning(_pendingPhotos),
-                key: const Key('logout_pending_photos_warning'),
-              )
-            : Text(l10n.logoutDialogBody),
+        content: !_hasPending
+            ? Text(l10n.logoutDialogBody)
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_pendingAttendance > 0)
+                    Text(
+                      l10n.logoutPendingAttendanceWarning(_pendingAttendance),
+                      key: const Key('logout_pending_attendance_warning'),
+                    ),
+                  if (_pendingAttendance > 0 && _pendingPhotos > 0)
+                    const SizedBox(height: TashilSpacing.sm),
+                  if (_pendingPhotos > 0)
+                    Text(
+                      l10n.logoutPendingPhotosWarning(_pendingPhotos),
+                      key: const Key('logout_pending_photos_warning'),
+                    ),
+                ],
+              ),
         actions: [
           TextButton(
             onPressed: _isLoggingOut ? null : () => Navigator.of(context).pop(),
-            child: Text(_pendingPhotos > 0 ? l10n.logoutWaitForPhotos : l10n.cancel),
+            child: Text(_hasPending ? l10n.logoutWaitForPhotos : l10n.cancel),
           ),
           tashilMaestroDevSemantics(
             identifier: 'tashil_logout_confirm_button',
@@ -156,7 +185,7 @@ class _LogoutDialogState extends State<_LogoutDialog> {
                         semanticsLabel: l10n.logout,
                       ),
                     )
-                  : Text(_pendingPhotos > 0 ? l10n.logoutAnyway : l10n.logout),
+                  : Text(_hasPending ? l10n.logoutAnyway : l10n.logout),
             ),
           ),
         ],

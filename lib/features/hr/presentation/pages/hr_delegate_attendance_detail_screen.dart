@@ -56,6 +56,10 @@ class DelegateAttendanceSession {
   /// until HR sets the check-out. Shown as «انصراف مش متسجل».
   final bool isMissingCheckOut;
 
+  /// TAS-363: check-in / check-out saved on the phone without network and
+  /// sent later. A flag for HR review only: the hours already count.
+  final OfflineAttendanceFlag offline;
+
   const DelegateAttendanceSession({
     required this.id,
     required this.checkInTime,
@@ -79,6 +83,7 @@ class DelegateAttendanceSession {
     this.checkOutOutsideBranch = false,
     this.checkOutDistanceMeters,
     this.isMissingCheckOut = false,
+    this.offline = OfflineAttendanceFlag.none,
   });
 
   /// Duration worked in this session (if check-out exists)
@@ -367,6 +372,92 @@ Future<Map<String, Map<String, dynamic>>> fetchDelegateAttendanceDocs({
     return null;
   }
   return (distanceMeters: d.toDouble(), inside: inside);
+}
+
+/// TAS-363: what the server wrote on an offline record.
+class OfflineAttendanceFlag {
+  const OfflineAttendanceFlag({
+    this.checkIn = false,
+    this.checkOut = false,
+    this.timeUntrusted = false,
+  });
+
+  static const none = OfflineAttendanceFlag();
+
+  final bool checkIn;
+  final bool checkOut;
+
+  /// The phone's time could not be trusted (restart, no sync, out of the
+  /// limits): the hours count from when the record reached the server.
+  final bool timeUntrusted;
+
+  bool get any => checkIn || checkOut;
+}
+
+/// Reads the offline flags of a session from its check-in and check-out
+/// records (`offlineCheckIn`, `offlineCheckOut`, `timeTrusted`,
+/// `checkOutTimeTrusted`).
+@visibleForTesting
+OfflineAttendanceFlag offlineAttendanceFlag(
+  Map<String, dynamic> checkIn,
+  Map<String, dynamic>? checkOut,
+) {
+  final inOffline = checkIn['offlineCheckIn'] == true;
+  final outOffline =
+      checkIn['offlineCheckOut'] == true || checkOut?['offlineCheckOut'] == true;
+  final untrusted = (inOffline && checkIn['timeTrusted'] == false) ||
+      (outOffline &&
+          (checkIn['checkOutTimeTrusted'] == false ||
+              checkOut?['timeTrusted'] == false));
+  return OfflineAttendanceFlag(
+    checkIn: inOffline,
+    checkOut: outOffline,
+    timeUntrusted: untrusted,
+  );
+}
+
+/// Label «بدون إنترنت» on a session for HR to look at (warning role, not an
+/// error). It never blocks pay.
+class AttendanceOfflineLabel extends StatelessWidget {
+  const AttendanceOfflineLabel({super.key, required this.flag});
+
+  final OfflineAttendanceFlag flag;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = HrStatusColors.of(context);
+    final what = flag.checkIn && flag.checkOut
+        ? 'حضور وانصراف بدون إنترنت'
+        : (flag.checkIn ? 'حضور بدون إنترنت' : 'انصراف بدون إنترنت');
+    final label = flag.timeUntrusted ? '$what (الوقت غير مؤكد)' : what;
+    final tip = flag.timeUntrusted
+        ? 'سُجّل على الهاتف بدون إنترنت، ووقت الهاتف غير موثوق، لذا تُحسب الساعات من وقت وصوله إلى الخادم. يمكنك تعديل الوقت.'
+        : 'سُجّل على الهاتف بدون إنترنت وأُرسل لاحقًا. تُحسب الساعات من وقت التسجيل على الهاتف.';
+    return Tooltip(
+      message: tip,
+      child: Container(
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: status.warningContainer,
+          borderRadius: BorderRadius.circular(HrRadius.card),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 14, color: status.onWarningContainer),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: status.onWarningContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Compact label on a session: the check-out was outside the branch.
@@ -779,6 +870,7 @@ class _HRDelegateAttendanceDetailScreenState
           checkOutOutsideBranch: serverOut.outside,
           checkOutDistanceMeters: serverOut.distanceMeters,
           isMissingCheckOut: isMissingCheckOut,
+          offline: offlineAttendanceFlag(checkInData, checkOutData),
         ),
       );
     }
@@ -2285,6 +2377,11 @@ class _HRDelegateAttendanceDetailScreenState
                         key: Key('hr_attendance_outside_checkout_${s.id}'),
                         distanceMeters: s.checkOutDistanceMeters,
                       ),
+                    if (s.offline.any)
+                      AttendanceOfflineLabel(
+                        key: Key('hr_attendance_offline_${s.id}'),
+                        flag: s.offline,
+                      ),
                   ],
                 ),
               ),
@@ -2603,6 +2700,11 @@ class _HRDelegateAttendanceDetailScreenState
                                           AttendanceOutsideCheckOutLabel(
                                             key: Key('hr_attendance_outside_checkout_${s.id}'),
                                             distanceMeters: s.checkOutDistanceMeters,
+                                          ),
+                                        if (s.offline.any)
+                                          AttendanceOfflineLabel(
+                                            key: Key('hr_attendance_offline_${s.id}'),
+                                            flag: s.offline,
                                           ),
                                       ],
                                     ),

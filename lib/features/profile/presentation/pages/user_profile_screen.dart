@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/wallet/presentation/pages/delegate_my_salary_screen.dart';
 import 'package:delegate_app/core/design/bidi.dart';
 import 'package:intl/intl.dart' hide TextDirection, Bidi;
 import 'package:flutter/services.dart';
@@ -291,6 +292,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 // TAS-387: the delegate's own data that was stored but never
                 // shown (code, national ID, city, chains, join date).
                 ..._buildWorkInfo(colorScheme, theme, l10n, effectiveDelegate),
+
+                // TAS-366: «مرتبي» (expected net) for delegate tokens, field
+                // and supervisor delegates alike.
+                if (effectiveDelegate?.role == UserRole.delegate) ...[
+                  const SizedBox(height: TashilSpacing.xl),
+                  _buildMySalaryCard(colorScheme, l10n, effectiveDelegate!),
+                ],
 
                 const SizedBox(height: TashilSpacing.xl),
 
@@ -1076,6 +1084,33 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ),
       ),
     ];
+  }
+
+  // ─── My salary (TAS-366) ───────────────────────────────────────
+  Widget _buildMySalaryCard(
+    ColorScheme colorScheme,
+    AppLocalizations l10n,
+    Delegate delegate,
+  ) {
+    return Card.filled(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        key: const Key('profileMySalaryTile'),
+        leading: Icon(Symbols.payments_rounded, color: colorScheme.primary),
+        title: Text(l10n.mySalary),
+        subtitle: const Text('الصافي المتوقع للشهر ده واللي فات'),
+        trailing: Icon(
+          Symbols.chevron_right_rounded,
+          color: colorScheme.onSurfaceVariant,
+        ),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => DelegateMySalaryScreen(delegate: delegate),
+          ),
+        ),
+      ),
+    );
   }
 
   // ─── Security Card ──────────────────────────────────────────────

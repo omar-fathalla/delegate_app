@@ -122,8 +122,28 @@ class LoadMoreHistoryRequested extends AttendanceEvent {
   ];
 }
 
+/// TAS-363: send what [userId] saved on the phone without network. With
+/// [reloadHistory] the history is read again afterwards (network back).
 class SyncRequested extends AttendanceEvent {
-  const SyncRequested();
+  const SyncRequested({
+    this.userId = '',
+    this.reloadHistory = false,
+    this.nationalityID,
+    this.phoneNumber,
+  });
+
+  final String userId;
+  final bool reloadHistory;
+  final String? nationalityID;
+  final String? phoneNumber;
+
+  @override
+  List<Object?> get props => [
+    userId,
+    reloadHistory,
+    nationalityID,
+    phoneNumber,
+  ];
 }
 
 class CheckOutAndCheckInRequested extends AttendanceEvent {

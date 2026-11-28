@@ -105,4 +105,60 @@ void main() {
     expect(find.textContaining('أثناء استخدام التطبيق'), findsOneWidget);
     expect(find.text('فتح إعدادات الموقع'), findsOneWidget);
   });
+
+  testWidgets('weak signal shows the weak-signal reason (TAS-396)', (
+    tester,
+  ) async {
+    await pump(tester, kind: LocationFailureKind.weakSignal, onRetry: () {});
+    expect(find.byKey(const Key('locationHelp.reason')), findsOneWidget);
+    expect(find.textContaining('الإشارة ضعيفة جوه المكان'), findsOneWidget);
+    expect(find.text('فتح إعدادات التطبيق'), findsNothing);
+    expect(find.text('إعادة فحص الموقع'), findsOneWidget);
+  });
+
+  testWidgets('no fix shows the no-location reason (TAS-396)', (tester) async {
+    await pump(tester, kind: LocationFailureKind.noFix);
+    expect(find.textContaining('مقدرناش نعرف موقعك'), findsOneWidget);
+    expect(find.textContaining('الإشارة ضعيفة'), findsNothing);
+  });
+
+  testWidgets('service off has no reason line (TAS-396)', (tester) async {
+    await pump(tester, kind: LocationFailureKind.serviceOff);
+    expect(find.byKey(const Key('locationHelp.reason')), findsNothing);
+  });
+
+  testWidgets(
+    'weak-signal reason also shows in the QR bottom sheet (TAS-396)',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('ar'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: TextButton(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => const SingleChildScrollView(
+                      child: LocationHelpCard(
+                        kind: LocationFailureKind.weakSignal,
+                        isAndroid: true,
+                      ),
+                    ),
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('الإشارة ضعيفة جوه المكان'), findsOneWidget);
+    },
+  );
 }

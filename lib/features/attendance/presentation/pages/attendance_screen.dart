@@ -21,6 +21,9 @@ import 'package:delegate_app/core/design/widgets/dialogs.dart';
 import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
 import 'package:delegate_app/core/design/widgets/summary_card.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_offline_queue.dart';
+import 'package:delegate_app/features/attendance/data/datasources/offline_branch_cache.dart';
+import 'package:delegate_app/features/attendance/domain/attendance_action_messages.dart';
 import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
@@ -88,6 +91,29 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   // --- Performance: Cache connectivity state instead of StreamBuilder ---
   bool _isOffline = false;
+
+  /// TAS-363: attendance saved on the phone, waiting for the network.
+  final AttendanceOfflineQueue? _offlineQueue =
+      sl.isRegistered<AttendanceOfflineQueue>()
+      ? sl<AttendanceOfflineQueue>()
+      : null;
+
+  int get _pendingOfflineCount => widget.viewOnly
+      ? 0
+      : (_offlineQueue?.pendingCount(widget.delegate.uid) ?? 0);
+
+  void _onOfflineQueueChanged() {
+    if (mounted) setState(() {});
+  }
+
+  SyncRequested _syncRequest({bool reloadHistory = false}) => SyncRequested(
+    userId: widget.viewOnly ? '' : widget.delegate.uid,
+    reloadHistory: reloadHistory,
+    nationalityID: widget.delegate.nationalityID,
+    phoneNumber: widget.delegate.phoneNumber,
+  );
+
+  String _clock(DateTime t) => Bidi.ltr(DateFormat.jm('ar').format(t));
   late final StreamSubscription<List<ConnectivityResult>> _connectivitySub;
 
   List<Attendance> _rawHistory = [];
@@ -384,7 +410,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (!widget.viewOnly) {
       Future.delayed(const Duration(seconds: 2), () {
         if (!_attendanceBloc.isClosed) {
-          _attendanceBloc.add(const SyncRequested());
+          _attendanceBloc.add(_syncRequest());
         }
       }).ignore();
     }
@@ -394,8 +420,22 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final offline = results.contains(ConnectivityResult.none);
       if (offline != _isOffline) {
         setState(() => _isOffline = offline);
+        // TAS-363: network back: send what was saved on the phone.
+        if (!offline && !widget.viewOnly && !_attendanceBloc.isClosed) {
+          _attendanceBloc.add(_syncRequest(reloadHistory: true));
+        }
       }
     });
+    _offlineQueue?.changes.addListener(_onOfflineQueueChanged);
+    Connectivity()
+        .checkConnectivity()
+        .then((results) {
+          final offline = results.contains(ConnectivityResult.none);
+          if (mounted && offline != _isOffline) {
+            setState(() => _isOffline = offline);
+          }
+        })
+        .catchError((_) {});
 
     _scrollController.addListener(_onScroll);
 
@@ -474,6 +514,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   void dispose() {
     _radarController.dispose();
     _connectivitySub.cancel();
+    _offlineQueue?.changes.removeListener(_onOfflineQueueChanged);
     _scrollController.dispose();
     _attendanceBloc.close();
     super.dispose();
@@ -648,9 +689,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             if (state.attendance.isSynced) {
               AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
             } else {
+              // TAS-363, message 3.7.
               AppSnackBar.showInfo(
                 context,
-                AppLocalizations.of(context)!.attCheckInSavedOffline,
+                offlineCheckInSavedMessage(
+                  _clock(state.attendance.checkInTime),
+                ),
               );
             }
             context.read<AttendanceBloc>().add(
@@ -670,7 +714,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             } else {
               AppSnackBar.showInfo(
                 context,
-                AppLocalizations.of(context)!.attCheckOutSavedOffline,
+                offlineCheckOutSavedMessage(
+                  _clock(state.attendance.checkOutTime ?? DateTime.now()),
+                ),
               );
             }
             context.read<AttendanceBloc>().add(
@@ -770,10 +816,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       widget.delegate.fullName.isNotEmpty
                           ? widget.delegate.fullName
                           : (widget.delegate.companyName.isNotEmpty
-                                ? AppLocalizations.of(context)!
-                                      .attDelegateOfCompany(
-                                        widget.delegate.companyName,
-                                      )
+                                ? AppLocalizations.of(
+                                    context,
+                                  )!.attDelegateOfCompany(
+                                    widget.delegate.companyName,
+                                  )
                                 : AppLocalizations.of(context)!.attendanceLog),
                     ),
                   )
@@ -996,12 +1043,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (_distanceToNearest != null && _distanceToNearest!.isFinite) {
       final meters = _distanceToNearest!.toInt();
       if (meters < 1000) {
-        formattedDistance = AppLocalizations.of(context)!
-            .distanceMeters(meters);
+        formattedDistance = AppLocalizations.of(
+          context,
+        )!.distanceMeters(meters);
       } else {
         final km = (_distanceToNearest! / 1000).toStringAsFixed(1);
-        formattedDistance = AppLocalizations.of(context)!
-            .distanceKmM(km, meters);
+        formattedDistance = AppLocalizations.of(
+          context,
+        )!.distanceKmM(km, meters);
       }
     }
 
@@ -1139,9 +1188,25 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ),
               ],
             ),
-            if (_isOffline) ...[
+            if (_isOffline || _pendingOfflineCount > 0) ...[
               const SizedBox(height: TashilSpacing.sm),
-              _buildConnectivityBadge(context, l10n),
+              Wrap(
+                spacing: TashilSpacing.sm,
+                runSpacing: TashilSpacing.xs,
+                children: [
+                  if (_isOffline) _buildConnectivityBadge(context, l10n),
+                  if (_pendingOfflineCount > 0)
+                    KeyedSubtree(
+                      key: const Key('attendance_pending_offline_count'),
+                      child: _statusLabel(
+                        context,
+                        l10n.attPendingOfflineCount(_pendingOfflineCount),
+                        Theme.of(context).colorScheme.secondaryContainer,
+                        Theme.of(context).colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                ],
+              ),
             ],
             const SizedBox(height: TashilSpacing.md),
 
@@ -1296,8 +1361,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             _isInsideGeofence
                                 ? Symbols.near_me_rounded
                                 : Symbols.straighten_rounded,
-                            AppLocalizations.of(context)!
-                                .distanceLabel(formattedDistance),
+                            AppLocalizations.of(
+                              context,
+                            )!.distanceLabel(formattedDistance),
                             color: onStatusContainer,
                           ),
                         if (activeBranch != null)
@@ -1309,8 +1375,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         if (allowedRadius != null)
                           infoLabel(
                             Symbols.radar_rounded,
-                            AppLocalizations.of(context)!
-                                .radiusLabel(allowedRadius),
+                            AppLocalizations.of(
+                              context,
+                            )!.radiusLabel(allowedRadius),
                             color: onStatusContainer,
                           ),
                       ],
@@ -1375,8 +1442,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   Widget _buildChainFilterBar(BuildContext context) {
-    final isArabic = Localizations.localeOf(context).languageCode
-        .startsWith('ar');
+    final isArabic = Localizations.localeOf(
+      context,
+    ).languageCode.startsWith('ar');
     final chains = _availableChains.isNotEmpty
         ? _availableChains
         : [
@@ -1526,7 +1594,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             if (_isGeofenceMode) {
               _detectNearestBranch(showSnackBar: false);
             }
-            _attendanceBloc.add(const SyncRequested());
+            _attendanceBloc.add(_syncRequest());
             _attendanceBloc.add(
               HistoryRequested(
                 userId: widget.delegate.uid,
@@ -1558,8 +1626,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   ),
                   const SizedBox(height: TashilSpacing.md),
                   Text(
-                    AppLocalizations.of(context)!
-                        .attNoSessionsInChain(selectedChainLabel),
+                    AppLocalizations.of(
+                      context,
+                    )!.attNoSessionsInChain(selectedChainLabel),
                     textAlign: TextAlign.center,
                     style: textTheme.titleSmall?.copyWith(
                       color: colorScheme.onSurface,
@@ -1567,8 +1636,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   ),
                   const SizedBox(height: TashilSpacing.sm),
                   Text(
-                    AppLocalizations.of(context)!
-                        .attDaysInOtherChains(_allAttendedDaysCount),
+                    AppLocalizations.of(
+                      context,
+                    )!.attDaysInOtherChains(_allAttendedDaysCount),
                     textAlign: TextAlign.center,
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
@@ -1637,7 +1707,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           if (_isGeofenceMode) {
             _detectNearestBranch(showSnackBar: false);
           }
-          _attendanceBloc.add(const SyncRequested());
+          _attendanceBloc.add(_syncRequest());
           _attendanceBloc.add(
             HistoryRequested(
               userId: widget.delegate.uid,
@@ -1773,8 +1843,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   // TAS-387: the session as a SummaryCard (P-07): branch and
                   // chain, the duration large on the end side, then check-in
                   // and check-out across the card.
-                  final warn = Theme.of(context)
-                      .extension<TashilSemanticColors>();
+                  final warn = Theme.of(
+                    context,
+                  ).extension<TashilSemanticColors>();
                   return SummaryCard(
                     icon: Symbols.storefront_rounded,
                     title: cleanBranchName,
@@ -1853,9 +1924,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       ),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: onContainer,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: onContainer),
       ),
     );
   }
@@ -1936,10 +2007,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         debugPrint('Attendance: root branches fetch failed: $e\n$st');
       }
 
-      final branchesList = keepMemberChainBranches(
+      var branchesList = keepMemberChainBranches(
         mergeOrgBranches(nested, root),
         {orgId},
       );
+      // TAS-363: keep the coordinates for a check-in without network, and
+      // fall back to them when nothing could be read.
+      final branchCache = sl.isRegistered<OfflineBranchCache>()
+          ? sl<OfflineBranchCache>()
+          : null;
+      if (branchesList.isNotEmpty) {
+        branchCache?.saveAll(orgId, branchesList).ignore();
+      } else if (_isOffline && branchCache != null) {
+        branchesList = branchCache.branchesOf(orgId);
+      }
       for (final b in branchesList) {
         BranchDisplayCache.instance.registerFromMap({
           'branchName': b.branchName,
@@ -1953,8 +2034,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           _orgBranches = branchesList;
           _isLoadingBranches = false;
           if (branchesList.isEmpty) {
-            _locationStatusMessage = AppLocalizations.of(context)!
-                .noBranchesForOrg;
+            _locationStatusMessage = AppLocalizations.of(
+              context,
+            )!.noBranchesForOrg;
             _isInsideGeofence = false;
           }
         });
@@ -2010,8 +2092,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (position == null) {
       setState(() {
         _isCheckingLocation = false;
-        _locationStatusMessage = AppLocalizations.of(context)!
-            .attLocationUnavailable;
+        _locationStatusMessage = AppLocalizations.of(
+          context,
+        )!.attLocationUnavailable;
       });
       return;
     }
@@ -2042,6 +2125,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
     }
 
+    final weakSignal =
+        matched == null &&
+        closest != null &&
+        minDistance.isFinite &&
+        isOutsideBecauseOfWeakSignal(
+          distanceMeters: minDistance,
+          accuracyMeters: position.accuracy,
+          radiusMeters: allowedGeofenceRadius(closest),
+        );
+
     setState(() {
       _isCheckingLocation = false;
       _nearestBranch = closest;
@@ -2062,10 +2155,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               )
             : AppLocalizations.of(context)!.attYouAreWithinBranch(branchLabel);
       } else if (closest != null && minDistance.isFinite) {
-        _locationStatusMessage = AppLocalizations.of(context)!.attMoveCloser;
+        // TAS-396: an imprecise fix whose error circle reaches the branch is
+        // a weak signal, not "move closer". The geofence decision is
+        // unchanged.
+        _locationStatusMessage = weakSignal
+            ? AppLocalizations.of(context)!.attWeakSignalNearBranch
+            : AppLocalizations.of(context)!.attMoveCloser;
+        if (weakSignal && !silent) {
+          _locationFailure = LocationFailureKind.weakSignal;
+        }
       } else {
-        _locationStatusMessage = AppLocalizations.of(context)!
-            .attOutsideApprovedBranches;
+        _locationStatusMessage = AppLocalizations.of(
+          context,
+        )!.attOutsideApprovedBranches;
       }
     });
 
@@ -2083,6 +2185,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             BranchDisplayCache.instance.displayName(matched.branchName),
             minDistance.toInt(),
           ),
+        );
+      } else if (weakSignal) {
+        AppSnackBar.showError(
+          context,
+          AppLocalizations.of(context)!.locationWeakSignal,
         );
       } else if (closest != null) {
         AppSnackBar.showError(
@@ -2632,11 +2739,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final fix = await _locationFetcher.fetch();
       if (fix == null) {
         if (context.mounted && !silent) {
+          // TAS-396: weak signal (imprecise position) vs no position at all.
+          final weak = _locationFetcher.lastFailure?.reason ==
+              LocationFetchFailureReason.weakSignal;
           AppSnackBar.showError(
             context,
-            AppLocalizations.of(context)!.locationTimeout,
+            locationFailureMessage(
+              AppLocalizations.of(context)!,
+              _locationFetcher.lastFailure,
+            ),
           );
-          _reportLocationFailure(context, LocationFailureKind.noFix);
+          _reportLocationFailure(
+            context,
+            weak ? LocationFailureKind.weakSignal : LocationFailureKind.noFix,
+          );
         }
         return null;
       }
@@ -3177,8 +3293,9 @@ class _ScannerModalState extends State<_ScannerModal>
                                   const SizedBox(width: TashilSpacing.sm),
                                 Builder(
                                   builder: (context) {
-                                    final sem = Theme.of(context)
-                                        .extension<TashilSemanticColors>();
+                                    final sem = Theme.of(
+                                      context,
+                                    ).extension<TashilSemanticColors>();
                                     return Container(
                                       padding:
                                           const EdgeInsetsDirectional.symmetric(
@@ -3193,8 +3310,9 @@ class _ScannerModalState extends State<_ScannerModal>
                                         ),
                                       ),
                                       child: Text(
-                                        AppLocalizations.of(context)!
-                                            .trustedTime,
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.trustedTime,
                                         style: textTheme.labelSmall?.copyWith(
                                           color: sem?.onSuccessContainer ??
                                               colorScheme.onPrimaryContainer,

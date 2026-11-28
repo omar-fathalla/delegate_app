@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/firestore/chunked_batch.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/core/error/exceptions.dart';
@@ -43,6 +44,16 @@ abstract class PenaltyRemoteDataSource {
     String? reviewerName,
   });
   Future<void> deletePenalty(String penaltyId);
+
+  /// TAS-365: respondToPenalty callable. [action] is `acknowledge`,
+  /// `dispute` or `resolve` ([decision] `uphold` / `cancel`). Throws
+  /// [ServerException] with the server's Arabic message.
+  Future<String> respondToPenalty({
+    required String penaltyId,
+    required String action,
+    String? reason,
+    String? decision,
+  });
   Future<void> updatePenalty(PenaltyModel penalty);
   Future<EvidenceFile> uploadEvidenceFile({
     required File file,
@@ -67,7 +78,11 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
     required this.firestore,
     required this.storage,
     String? Function()? currentUid,
+    this.respondCallable,
   }) : currentUid = currentUid ?? _authUid;
+
+  /// TAS-365: test seam for the respondToPenalty callable.
+  final Future<Object?> Function(Map<String, dynamic> payload)? respondCallable;
 
   static String? _authUid() {
     try {
@@ -177,50 +192,10 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
             : 'المندوب';
         final descStr = finalPenalty.incidentDescription.trim();
 
-        // -------------------------------------------------------------
-        // 1. Notification to the Target Delegate (المندوب المعني بالغرامة)
-        // -------------------------------------------------------------
-        if (finalPenalty.targetDelegateId != null && finalPenalty.targetDelegateId!.trim().isNotEmpty) {
-          final targetDelId = finalPenalty.targetDelegateId!.trim();
-          String? delPhone;
-          try {
-            final uDoc = await firestore.collection('users').doc(targetDelId).get();
-            if (uDoc.exists) {
-              delPhone = (uDoc.data()?['phoneNumber'] ?? uDoc.data()?['phone']) as String?;
-            }
-          } catch (_) {}
-
-          final delTitle = 'تسجيل مخالفة جديدة بحقك';
-          final delBody = 'تم تسجيل مخالفة (${finalPenalty.title}) بمبلغ $fineStr ج.م بفرع ($branchStr).'
-              '${descStr.isNotEmpty ? "\nالسبب: $descStr" : ""}';
-
-          await firestore.collection('notifications').add({
-            ...await _sender(),
-            'title': delTitle,
-            'body': delBody,
-            'type': 'penalty',
-            'penaltyId': docRef.id,
-            'companyId': finalPenalty.companyId,
-            'companyName': finalPenalty.companyName,
-            'branchId': finalPenalty.branchId,
-            'branchName': finalPenalty.branchName,
-            'targetDelegateId': finalPenalty.targetDelegateId,
-            'targetDelegateName': finalPenalty.targetDelegateName,
-            'fineAmount': finalPenalty.fineAmount,
-            'category': finalPenalty.category,
-            'incidentDescription': finalPenalty.incidentDescription,
-            'createdById': finalPenalty.createdById,
-            'createdByName': finalPenalty.createdByName,
-            'senderName': finalPenalty.createdByName,
-            'senderRole': 'supervisor',
-            'delegateUid': targetDelId,
-            if (delPhone != null && delPhone.isNotEmpty) 'phoneNumber': delPhone,
-            'isRead': false,
-            'read': false,
-            'createdAt': FieldValue.serverTimestamp(),
-            'deletedBy': <String>[],
-          });
-        }
+        // TAS-365: the delegate's notification is written by the server
+        // (onPenaltyCreated / onPenaltyUpdated) when the penalty reaches
+        // ISSUED. A new penalty starts PENDING_BRANCHES_MARKETING, so the
+        // delegate is not told about a penalty that may still be rejected.
 
         // -------------------------------------------------------------
         // 2. Notifications to Company Supervisors & Company Admins (مشرفي ومسؤولي الشركة)
@@ -725,6 +700,9 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
       final updateData = <String, dynamic>{
         'status': status.toFirestoreString(),
         'updatedAt': FieldValue.serverTimestamp(),
+        // TAS-365: same serverTimestamp as updatedAt tells onPenaltyUpdated
+        // that this app does not write the delegate's notification itself.
+        'notifyByServerAt': FieldValue.serverTimestamp(),
       };
 
       if (rejectionReason != null && rejectionReason.isNotEmpty) {
@@ -829,30 +807,8 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
                 '${rejectionReason != null && rejectionReason.isNotEmpty ? "\nسبب الرفض: $rejectionReason" : ""}';
           }
 
-          // Notify delegate
-          if (pen.targetDelegateId != null && pen.targetDelegateId!.isNotEmpty) {
-            await firestore.collection('notifications').add({
-              ...await _sender(),
-              'title': updateTitle,
-              'body': updateBody,
-              'type': 'penalty',
-              'penaltyId': penaltyId,
-              'companyId': pen.companyId,
-              'companyName': pen.companyName,
-              'branchId': pen.branchId,
-              'branchName': pen.branchName,
-              'targetDelegateId': pen.targetDelegateId,
-              'targetDelegateName': pen.targetDelegateName,
-              'fineAmount': pen.fineAmount,
-              'senderName': revName,
-              'senderRole': revRole,
-              'delegateUid': pen.targetDelegateId,
-              'isRead': false,
-              'read': false,
-              'createdAt': FieldValue.serverTimestamp(),
-              'deletedBy': <String>[],
-            });
-          }
+          // TAS-365: the delegate's notification (issued, cancelled,
+          // deducted, dispute result) is written by onPenaltyUpdated.
 
           // Notify company supervisors
           await firestore.collection('notifications').add({
@@ -893,6 +849,37 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
       throw ServerException(e.message ?? 'فشل في حذف المخالفة.');
     } catch (_) {
       throw ServerException('حدث خطأ غير متوقع أثناء حذف المخالفة.');
+    }
+  }
+
+  @override
+  Future<String> respondToPenalty({
+    required String penaltyId,
+    required String action,
+    String? reason,
+    String? decision,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'penaltyId': penaltyId,
+        'action': action,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+        'decision': ?decision,
+      };
+      final call = respondCallable ??
+          (Map<String, dynamic> p) async => (await FirebaseFunctions.instanceFor(
+                region: 'us-central1',
+              ).httpsCallable('respondToPenalty').call(p))
+                  .data;
+      final data = await call(payload);
+      if (data is Map && data['status'] is String) return data['status'] as String;
+      return '';
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? 'تعذر إرسال الرد على الجزاء.');
+    } on ServerException {
+      rethrow;
+    } catch (_) {
+      throw ServerException('تعذر إرسال الرد على الجزاء. حاول تاني.');
     }
   }
 
