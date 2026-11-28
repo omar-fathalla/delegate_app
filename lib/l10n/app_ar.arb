@@ -2132,5 +2132,10 @@
   "locHelpStepMapsRetry": "لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع ودوس «إعادة فحص الموقع».",
   "locHelpStepMapsTryAgain": "لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع وجرّب تاني.",
   "attBranchOtherChain": "الفرع ده تبع سلسلة {chain}. بدّل للسلسلة دي الأول وبعدين جرّب تاني.",
-  "attBranchNotYourChain": "الفرع ده مش تبع أي سلسلة من سلاسلك. امسح كود الفرع بتاعك."
+  "attBranchNotYourChain": "الفرع ده مش تبع أي سلسلة من سلاسلك. امسح كود الفرع بتاعك.",
+  "leaveOverlapExists": "عندك إجازة في الأيام دي: فيه طلب {type} من {from} لـ {to}. غيّر التاريخ أو امسح القديم",
+  "@leaveOverlapExists": {"placeholders": {"type": {"type": "String"}, "from": {"type": "String"}, "to": {"type": "String"}}},
+  "leaveTooOld": "تقدر تطلب لحد {days} أيام فاتوا بس، وللأقدم كلّم الـ HR",
+  "@leaveTooOld": {"placeholders": {"days": {"type": "int"}}},
+  "leaveMustStartToday": "الطلب ده لازم يبدأ من النهارده أو بعده، وللأقدم كلّم الـ HR"
 }

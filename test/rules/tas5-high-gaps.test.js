@@ -142,7 +142,7 @@ describe("TAS-46: leave_requests", () => {
   const leave = (over) => ({
     id: "x", delegateUid: "del-a", delegateName: "Fake", delegatePhone: "01000000000",
     companyUID: CO_A, organizationUID: ORG_A, type: "annual", isHourly: false, hoursCount: null,
-    startDate: ts("2026-12-01T00:00:00Z"), endDate: ts("2026-12-02T00:00:00Z"), daysCount: 2,
+    startDate: Timestamp.fromMillis(Date.now() + 86400000), endDate: Timestamp.fromMillis(Date.now() + 2 * 86400000), daysCount: 2,
     reason: "r", attachmentUrl: null, createdAt: serverTimestamp(), status: "pending",
     resolvedAt: null, resolvedBy: null, resolvedByName: null, rejectReason: null, ...over,
   });

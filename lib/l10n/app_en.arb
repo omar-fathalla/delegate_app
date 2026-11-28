@@ -2703,5 +2703,10 @@
   "attBranchOtherChain": "This branch belongs to {chain}. Switch to that chain first, then try again.",
   "@attBranchOtherChain": {"description": "TAS-333 QR/branch of another chain of the delegate", "placeholders": {"chain": {"type": "String"}}},
   "attBranchNotYourChain": "This branch is not in any of your chains. Scan your own branch's code.",
-  "@attBranchNotYourChain": {"description": "TAS-333 QR/branch of a chain the delegate is not a member of"}
+  "@attBranchNotYourChain": {"description": "TAS-333 QR/branch of a chain the delegate is not a member of"},
+  "leaveOverlapExists": "You already have leave on these days: a {type} request from {from} to {to}. Change the dates or delete the old one",
+  "@leaveOverlapExists": {"placeholders": {"type": {"type": "String"}, "from": {"type": "String"}, "to": {"type": "String"}}},
+  "leaveTooOld": "You can only request up to {days} days back; for older dates contact HR",
+  "@leaveTooOld": {"placeholders": {"days": {"type": "int"}}},
+  "leaveMustStartToday": "This request must start today or later; for older dates contact HR"
 }
