@@ -1,10 +1,13 @@
 import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
+import 'package:delegate_app/core/design/bidi.dart';
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
 import 'package:delegate_app/features/hr/data/hr_leave_settings_writer.dart';
+import 'package:delegate_app/features/hr/domain/leave_overlap.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+import 'package:intl/intl.dart' hide Bidi, TextDirection;
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
@@ -1856,6 +1859,18 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 final messenger = ScaffoldMessenger.of(context);
                                 final successColor = HrStatusColors.of(context).success;
                                 final days = endDate.difference(startDate).inDays + 1;
+                                final mayRecord = await _leaveOverlapGate(
+                                  delegateUid: selectedDelegate!.uid,
+                                  candidate: LeaveSpan(
+                                    id: '',
+                                    type: selectedType,
+                                    isHourly: false,
+                                    status: 'approved',
+                                    start: DateTime(startDate.year, startDate.month, startDate.day),
+                                    end: DateTime(endDate.year, endDate.month, endDate.day),
+                                  ),
+                                );
+                                if (!mayRecord) return;
                                 final docRef = FirebaseFirestore.instance
                                     .collection('leave_requests')
                                     .doc();
@@ -1911,10 +1926,88 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     );
   }
 
+  static String _hrLeaveTypeLabel(String type) => switch (type) {
+    'sick' => 'إجازة مرضية',
+    'emergency' => 'إجازة عارضة',
+    'delay' => 'عذر تأخير',
+    'early_leave' => 'إذن انصراف مبكر',
+    'absence' => 'عذر غياب',
+    'unpaid' => 'إجازة بدون أجر',
+    _ => 'إجازة اعتيادية',
+  };
+
+  /// TAS-370 (user decision 2026-11-27): before HR approves or records a
+  /// leave, look for another live leave of the same delegate on the same
+  /// days. An approved one blocks (payroll would count the days twice); a
+  /// pending one only warns. Returns true when HR may go on.
+  Future<bool> _leaveOverlapGate({
+    required String delegateUid,
+    required LeaveSpan candidate,
+  }) async {
+    final List<LeaveSpan> existing;
+    try {
+      existing = await LeaveOverlap.loadForDelegate(
+        widget.firestore ?? FirebaseFirestore.instance,
+        companyUID: widget.hrDelegate.companyUID,
+        delegateUid: delegateUid,
+      );
+    } catch (_) {
+      // A failed read never blocks HR; the decision stays theirs.
+      return true;
+    }
+    final conflict = LeaveOverlap.find(candidate, existing);
+    if (conflict == null || !mounted) return true;
+    final fmt = DateFormat('yyyy-MM-dd');
+    final from = Bidi.ltr(fmt.format(conflict.start));
+    final to = Bidi.ltr(fmt.format(conflict.end));
+    final label = _hrLeaveTypeLabel(conflict.type);
+    if (conflict.isApproved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'لا يمكن الاعتماد: توجد $label معتمدة لنفس المندوب من $from إلى $to.',
+          ),
+        ),
+      );
+      return false;
+    }
+    final go = await showTashilDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('يوجد طلب آخر على نفس الأيام'),
+        content: Text(
+          'يوجد طلب $label قيد المراجعة لنفس المندوب من $from إلى $to. '
+          'هل تريد الاعتماد على أي حال؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('رجوع'),
+          ),
+          TextButton(
+            key: const Key('leaveOverlapApproveAnyway'),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('اعتماد'),
+          ),
+        ],
+      ),
+    );
+    return go ?? false;
+  }
+
   Future<void> _approveLeave(Map<String, dynamic> leave) async {
     final docId = leave['docId']?.toString() ?? '';
     final delegateUid = leave['delegateUid']?.toString() ?? '';
     final delegateName = leave['delegateName']?.toString() ?? '';
+
+    final candidate = LeaveSpan.fromMap(docId, leave);
+    if (candidate != null &&
+        !await _leaveOverlapGate(
+          delegateUid: delegateUid,
+          candidate: candidate,
+        )) {
+      return;
+    }
 
     try {
       await FirebaseFirestore.instance

@@ -12,7 +12,9 @@ import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
+
 import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
@@ -20,6 +22,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' hide Bidi, TextDirection;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/domain/leave_overlap.dart';
 import 'package:delegate_app/features/hr/domain/services/leave_notification_target.dart';
 import 'package:delegate_app/features/hr/domain/services/payroll_day_rules.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
@@ -163,9 +166,8 @@ class _DelegateLeavesAndRequestsScreenState
                     widget.delegate.companyName.isNotEmpty
                         ? widget.delegate.companyName
                         : widget.delegate.organizationName,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                    style: Theme.of(context).textTheme.labelSmall
+                        ?.copyWith(color: colorScheme.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -317,9 +319,8 @@ class _DelegateLeavesAndRequestsScreenState
                             Text(
                               _selectedStatusFilter == 'all'
                                   ? AppLocalizations.of(context)!.reqEmptyAll
-                                  : AppLocalizations.of(
-                                      context,
-                                    )!.reqEmptyFilter,
+                                  : AppLocalizations.of(context)!
+                                        .reqEmptyFilter,
                               style: theme.textTheme.titleSmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600,
@@ -476,9 +477,8 @@ class _DelegateLeavesAndRequestsScreenState
     ),
     child: Text(
       text,
-      style: Theme.of(
-        context,
-      ).textTheme.labelMedium?.copyWith(color: onContainer),
+      style: Theme.of(context).textTheme.labelMedium
+          ?.copyWith(color: onContainer),
     ),
   );
 
@@ -987,6 +987,16 @@ class _DelegateLeavesAndRequestsScreenState
   }
 
   // ── تسجيل إجازة / عذر جديد ──
+  String _leaveTypeLabel(AppLocalizations l10n, String type) => switch (type) {
+    'sick' => l10n.leaveSick,
+    'emergency' => l10n.leaveEmergency,
+    'delay' => l10n.excuseLate,
+    'early_leave' => l10n.excuseEarlyLeave,
+    'absence' => l10n.excuseAbsence,
+    'unpaid' => l10n.leaveUnpaid,
+    _ => l10n.leaveAnnual,
+  };
+
   // TAS-353 (C-27): a FormDialog (full screen on compact, basic dialog from
   // 600dp). ✕ is the only way out and asks before dropping edits; the save
   // action is named after its result. Fields are outlined: DateField (C-14)
@@ -1051,6 +1061,54 @@ class _DelegateLeavesAndRequestsScreenState
             if (!_isAnnualLeaveEnabled && selectedType == 'annual') {
               showTashilSnackBar(context, l10n.annualNotActive);
               return;
+            }
+            // TAS-370: the same backdate limit the rules enforce, and no
+            // second request on days another live request already covers.
+            if (submittedLeaveId == null) {
+              final backDays = LeaveBackdate.daysFor(
+                selectedType,
+                isHourly: isHourly,
+              );
+              final first = LeaveBackdate.firstDate(
+                today,
+                selectedType,
+                isHourly: isHourly,
+              );
+              if (startDate.isBefore(first)) {
+                showTashilSnackBar(
+                  context,
+                  backDays == 0
+                      ? l10n.leaveMustStartToday
+                      : l10n.leaveTooOld(backDays),
+                );
+                return;
+              }
+              final conflict = LeaveOverlap.find(
+                LeaveSpan(
+                  id: '',
+                  type: selectedType,
+                  isHourly: isHourly,
+                  status: 'pending',
+                  start: startDate,
+                  end: isHourly ? startDate : endDate,
+                ),
+                [
+                  for (final d in _leaveDocs)
+                    ?LeaveSpan.fromMap(d.id, d.data()),
+                ],
+              );
+              if (conflict != null) {
+                final fmt = DateFormat('d/M');
+                showTashilSnackBar(
+                  context,
+                  l10n.leaveOverlapExists(
+                    _leaveTypeLabel(l10n, conflict.type),
+                    Bidi.ltr(fmt.format(conflict.start)),
+                    Bidi.ltr(fmt.format(conflict.end)),
+                  ),
+                );
+                return;
+              }
             }
             final String? fromTimeFormatted = isHourly
                 ? fromTime.format(context)
@@ -1267,6 +1325,22 @@ class _DelegateLeavesAndRequestsScreenState
                     edit(() {
                       selectedType = val;
                       isHourly = (val == 'delay' || val == 'early_leave');
+                      // TAS-370: a stricter type moves a too-old date back
+                      // to today, so the picker never opens before its
+                      // first day.
+                      final first = LeaveBackdate.firstDate(
+                        today,
+                        val,
+                        isHourly: isHourly,
+                      );
+                      if (startDate.isBefore(first)) {
+                        startDate = DateTime(
+                          today.year,
+                          today.month,
+                          today.day,
+                        );
+                        if (endDate.isBefore(startDate)) endDate = startDate;
+                      }
                     });
                   },
                 ),
@@ -1276,7 +1350,11 @@ class _DelegateLeavesAndRequestsScreenState
                     key: const Key('newRequestDate'),
                     label: '${l10n.dateField} *',
                     value: startDate,
-                    firstDate: today.subtract(const Duration(days: 30)),
+                    firstDate: LeaveBackdate.firstDate(
+                      today,
+                      selectedType,
+                      isHourly: true,
+                    ),
                     lastDate: today.add(const Duration(days: 60)),
                     onChanged: (d) {
                       if (d == null) return;
@@ -1328,7 +1406,12 @@ class _DelegateLeavesAndRequestsScreenState
                     key: const Key('newRequestStart'),
                     label: '${l10n.fromField} *',
                     value: startDate,
-                    firstDate: DateTime(2024),
+                    // TAS-370: was DateTime(2024); the rules refuse older.
+                    firstDate: LeaveBackdate.firstDate(
+                      today,
+                      selectedType,
+                      isHourly: false,
+                    ),
                     lastDate: DateTime(2030),
                     onChanged: (d) {
                       if (d == null) return;
