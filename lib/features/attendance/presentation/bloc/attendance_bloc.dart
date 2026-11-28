@@ -10,7 +10,8 @@ import 'package:delegate_app/features/attendance/domain/usecases/get_history.dar
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_paginated.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/core/services/review_service.dart';
-import 'package:delegate_app/core/usecases/usecase.dart';
+import 'package:delegate_app/features/attendance/data/repositories/attendance_repository_impl.dart'
+    show OfflineAttendanceRejected;
 
 part 'attendance_event.dart';
 part 'attendance_state.dart';
@@ -276,16 +277,28 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       emit(currentState.copyWith(syncStatus: SyncStatus.inProgress));
     }
 
-    final result = await syncAttendance(NoParams());
+    if (event.userId.trim().isEmpty) {
+      if (currentState is AttendanceHistoryLoaded) {
+        emit(currentState.copyWith(syncStatus: SyncStatus.success));
+      }
+      return;
+    }
+    final result = await syncAttendance(
+      SyncAttendanceParams(userId: event.userId),
+    );
 
     result.fold(
       (failure) {
-        if (state is AttendanceHistoryLoaded) {
-          emit(
-            (state as AttendanceHistoryLoaded).copyWith(
-              syncStatus: SyncStatus.failure,
-            ),
-          );
+        final loaded = state is AttendanceHistoryLoaded
+            ? (state as AttendanceHistoryLoaded)
+            : null;
+        // A record saved offline was refused by the server: say why.
+        if (failure is OfflineAttendanceRejected) {
+          emit(AttendanceError(message: failure.message));
+          if (loaded != null) emit(loaded);
+        }
+        if (loaded != null) {
+          emit(loaded.copyWith(syncStatus: SyncStatus.failure));
         }
       },
       (_) {
@@ -298,6 +311,17 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         }
       },
     );
+    if (event.reloadHistory) {
+      _invalidateUserCache(event.userId);
+      add(
+        HistoryRequested(
+          userId: event.userId,
+          organizationId: '',
+          nationalityID: event.nationalityID,
+          phoneNumber: event.phoneNumber,
+        ),
+      );
+    }
   }
 
   Future<void> _onCheckOutAndCheckIn(

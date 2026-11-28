@@ -2142,5 +2142,9 @@
   "@leaveOverlapExists": {"placeholders": {"type": {"type": "String"}, "from": {"type": "String"}, "to": {"type": "String"}}},
   "leaveTooOld": "تقدر تطلب لحد {days} أيام فاتوا بس، وللأقدم كلّم الـ HR",
   "@leaveTooOld": {"placeholders": {"days": {"type": "int"}}},
-  "leaveMustStartToday": "الطلب ده لازم يبدأ من النهارده أو بعده، وللأقدم كلّم الـ HR"
+  "leaveMustStartToday": "الطلب ده لازم يبدأ من النهارده أو بعده، وللأقدم كلّم الـ HR",
+  "attPendingOfflineCount": "{count} حضور/انصراف مستني يتبعت",
+  "@attPendingOfflineCount": {"placeholders": {"count": {"type": "int"}}},
+  "logoutPendingAttendanceWarning": "استنى! {count} حضور/انصراف لسه على الموبايل وماتبعتش. لو خرجت دلوقتي مش هيتبعتوا لحد ما تدخل تاني بنفس الحساب، فاستنى النت يرجع.",
+  "@logoutPendingAttendanceWarning": {"placeholders": {"count": {"type": "int"}}}
 }
