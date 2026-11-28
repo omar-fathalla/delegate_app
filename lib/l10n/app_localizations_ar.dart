@@ -937,6 +937,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get violationsPolicy => 'لائحة المخالفات';
 
   @override
+  String get mySalary => 'مرتبي';
+
+  @override
   String get myViolations => 'مخالفاتي';
 
   @override

@@ -1262,6 +1262,7 @@
     "description": "Wallets management label"
   },
   "violationsPolicy": "لائحة المخالفات",
+  "mySalary": "مرتبي",
   "myViolations": "مخالفاتي",
   "switchOrganization": "تبديل المنظمة",
   "manageOrganizationsChains": "إدارة المنظمات والسلاسل",
